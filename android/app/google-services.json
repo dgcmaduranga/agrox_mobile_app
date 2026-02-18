@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "970283051301",
+    "project_id": "agrox-98686",
+    "storage_bucket": "agrox-98686.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:970283051301:android:65f922bdc14ec7a1b192cc",
+        "android_client_info": {
+          "package_name": "com.agrox.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "970283051301-fjbe3ehol2j8c9r617ljl9ifqao2e9ng.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.agrox.mobile",
+            "certificate_hash": "0172543fe1f32adc8478e03521e9717c2edee404"
+          }
+        },
+        {
+          "client_id": "970283051301-c2hhbc8f82bun6c1s5s3q1u0l331slc4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDr4w20uyNDn6kwodoEiAunXVBV1YF29uI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "970283051301-c2hhbc8f82bun6c1s5s3q1u0l331slc4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
