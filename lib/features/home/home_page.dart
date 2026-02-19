@@ -68,11 +68,14 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: isDark
+          ? const Color(0xFF121212)
+          : const Color(0xFFF6F7F9),
 
-      /// 🔥 CENTER BUTTON (FIXED PERFECT)
+      /// 🔥 FAB
       floatingActionButton: GestureDetector(
         onTapDown: (_) => setState(() => _isFabPressed = true),
         onTapUp: (_) {
@@ -80,27 +83,22 @@ class _HomePageState extends State<HomePage> {
           Navigator.pushNamed(context, '/scan');
         },
         onTapCancel: () => setState(() => _isFabPressed = false),
-
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           height: 62,
           width: 62,
-
           transform: _isFabPressed
               ? (Matrix4.identity()..scale(0.9))
               : Matrix4.identity(),
-
           decoration: BoxDecoration(
-            color: Colors.white, // ✅ always white
+            color: Colors.white,
             shape: BoxShape.circle,
-
             border: Border.all(
               color: _isFabPressed
-                  ? Colors.green.shade800 // dark
-                  : Colors.green.shade300, // light
+                  ? Colors.green.shade800
+                  : Colors.green.shade300,
               width: _isFabPressed ? 3 : 2,
             ),
-
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.08),
@@ -109,7 +107,6 @@ class _HomePageState extends State<HomePage> {
               )
             ],
           ),
-
           child: Icon(
             Icons.camera_alt,
             size: 26,
@@ -122,198 +119,182 @@ class _HomePageState extends State<HomePage> {
 
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
+      /// 🔥 SAFE AREA FIX
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 90), // 🔥 IMPORTANT (bottom space)
+          physics: const BouncingScrollPhysics(),
+          children: [
 
-          child: ListView(
-            children: [
-
-              const SizedBox(height: 12),
-
-              /// 🔥 HEADER
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "${getGreeting()}, ${user?.displayName ?? "User"} 👋",
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+            /// HEADER
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "${getGreeting()}, ${user?.displayName ?? "User"} 👋",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black,
                   ),
-
-                  Stack(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.notifications_none),
-                        onPressed: () {},
-                      ),
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          height: 8,
-                          width: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
+                ),
+                Stack(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.notifications_none,
+                          color: isDark ? Colors.white : Colors.black),
+                      onPressed: () {},
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        height: 8,
+                        width: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
                         ),
-                      )
-                    ],
-                  )
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              /// WEATHER
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                      ),
                     )
                   ],
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _WeatherItem(icon: Icons.thermostat, text: "28°C"),
-                    _WeatherItem(icon: Icons.water_drop, text: "76%"),
-                    _WeatherItem(icon: Icons.grain, text: "1.2 mm"),
+                )
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            /// WEATHER
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _WeatherItem(icon: Icons.thermostat, text: "28°C"),
+                  _WeatherItem(icon: Icons.water_drop, text: "76%"),
+                  _WeatherItem(icon: Icons.grain, text: "1.2 mm"),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            /// ALERT
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.orange.shade100,
+                    Colors.yellow.shade100,
                   ],
                 ),
+                borderRadius: BorderRadius.circular(14),
               ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  SizedBox(width: 10),
+                  Expanded(child: Text("High Risk for Brown Spot")),
+                ],
+              ),
+            ),
 
-              const SizedBox(height: 14),
+            const SizedBox(height: 18),
 
-              /// ALERT
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.orange.shade100,
-                      Colors.yellow.shade100,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Row(
+            /// CAROUSEL
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                height: 170,
+                child: Stack(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                    SizedBox(width: 10),
-                    Expanded(child: Text("High Risk for Brown Spot")),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              /// 🔥 CAROUSEL (FIXED TEXT + GRADIENT)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SizedBox(
-                  height: 170,
-                  child: Stack(
-                    children: [
-                      PageView.builder(
-                        controller: _pageController,
-                        itemCount: images.length,
-                        itemBuilder: (context, index) {
-                          return Image.asset(
-                            images[index],
-                            fit: BoxFit.cover,
-                          );
-                        },
-                      ),
-
-                      /// 🔥 overlay
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.black.withOpacity(0.5),
-                              Colors.transparent
-                            ],
-                            begin: Alignment.bottomLeft,
-                            end: Alignment.topRight,
-                          ),
-                        ),
-                      ),
-
-                      /// 🔥 TEXT BACK
-                      const Positioned(
-                        left: 16,
-                        bottom: 16,
-                        child: Text(
-                          "AI-powered detection\nfor Paddy, Tea & Coconut",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              /// 🔥 DOTS BACK
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(images.length, (index) {
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: _currentIndex == index ? 10 : 6,
-                    height: _currentIndex == index ? 10 : 6,
-                    decoration: BoxDecoration(
-                      color: _currentIndex == index
-                          ? Colors.green
-                          : Colors.grey.shade400,
-                      shape: BoxShape.circle,
+                    PageView.builder(
+                      controller: _pageController,
+                      itemCount: images.length,
+                      itemBuilder: (context, index) {
+                        return Image.asset(
+                          images[index],
+                          fit: BoxFit.cover,
+                        );
+                      },
                     ),
-                  );
-                }),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withOpacity(0.5),
+                            Colors.transparent
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Positioned(
+                      left: 16,
+                      bottom: 16,
+                      child: Text(
+                        "AI-powered detection\nfor Paddy, Tea & Coconut",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+            ),
 
-              const SizedBox(height: 22),
+            const SizedBox(height: 10),
 
-              /// CARDS
-              _menuCard(0, Icons.camera_alt, Colors.green,
-                  "Scan Leaf", "Upload or Capture image", () {
-                Navigator.pushNamed(context, '/scan');
+            /// DOTS
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(images.length, (index) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: _currentIndex == index ? 10 : 6,
+                  height: _currentIndex == index ? 10 : 6,
+                  decoration: BoxDecoration(
+                    color: _currentIndex == index
+                        ? Colors.green
+                        : Colors.grey.shade400,
+                    shape: BoxShape.circle,
+                  ),
+                );
               }),
+            ),
 
-              _menuCard(1, Icons.menu_book, Colors.orange,
-                  "Knowledge Hub", "Learn diseases & treatments", () {
-                Navigator.pushNamed(context, '/knowledge');
-              }),
+            const SizedBox(height: 22),
 
-              _menuCard(2, Icons.smart_toy, Colors.blue,
-                  "Ask AgroX AI", "Instant farming advice", () {
-                Navigator.pushNamed(context, '/chatbot');
-              }),
+            _menuCard(0, Icons.camera_alt, Colors.green,
+                "Scan Leaf", "Upload or Capture image", () {
+              Navigator.pushNamed(context, '/scan');
+            }),
 
-              const SizedBox(height: 20),
-            ],
-          ),
+            _menuCard(1, Icons.menu_book, Colors.orange,
+                "Knowledge Hub", "Learn diseases & treatments", () {
+              Navigator.pushNamed(context, '/knowledge');
+            }),
+
+            _menuCard(2, Icons.smart_toy, Colors.blue,
+                "Ask AgroX AI", "Instant farming advice", () {
+              Navigator.pushNamed(context, '/chatbot');
+            }),
+          ],
         ),
       ),
 
       /// BOTTOM NAV
       bottomNavigationBar: BottomAppBar(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        elevation: 8,
         shape: const CircularNotchedRectangle(),
         notchMargin: 6,
         child: SizedBox(
@@ -331,16 +312,27 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  ////////////////////////////////////////////////////////////
+
   Widget _navItem(IconData icon, String label, int index) {
     final isSelected = _bottomIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
-      onTap: () => setState(() => _bottomIndex = index),
+      onTap: () {
+        setState(() => _bottomIndex = index);
+
+        if (index == 1) {
+          Navigator.pushNamed(context, '/profile');
+        }
+      },
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon,
-              color: isSelected ? Colors.green : Colors.grey),
+              color: isSelected
+                  ? Colors.green
+                  : Colors.grey),
           const SizedBox(height: 2),
           Text(label,
               style: TextStyle(
@@ -354,6 +346,7 @@ class _HomePageState extends State<HomePage> {
   Widget _menuCard(int index, IconData icon, Color color, String title,
       String subtitle, VoidCallback onTap) {
     final isSelected = _selectedIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () {
@@ -376,7 +369,7 @@ class _HomePageState extends State<HomePage> {
                 : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         ),
         child: Row(
           children: [
@@ -396,12 +389,15 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 14)),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: isDark ? Colors.white : Colors.black)),
                   const SizedBox(height: 4),
                   Text(subtitle,
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.grey)),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey)),
                 ],
               ),
             ),
@@ -420,11 +416,16 @@ class _WeatherItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Row(
       children: [
         Icon(icon, color: Colors.grey, size: 18),
         const SizedBox(width: 5),
-        Text(text, style: const TextStyle(fontSize: 13)),
+        Text(text,
+            style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white : Colors.black)),
       ],
     );
   }
