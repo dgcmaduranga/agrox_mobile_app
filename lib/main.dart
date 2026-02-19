@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+
 import 'firebase_options.dart';
 
 // Pages
@@ -10,6 +12,10 @@ import 'features/auth/login_page.dart';
 import 'features/auth/signup_page.dart';
 import 'features/auth/reset_password_page.dart';
 import 'features/home/home_page.dart';
+import 'features/profile/profile_page.dart';
+
+// 🔥 THEME PROVIDER
+import 'services/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,25 +24,118 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const AgroXApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: const AgroXApp(),
+    ),
+  );
 }
+
+///////////////////////////////////////////////////////////////
+/// 🔥 MAIN APP
+///////////////////////////////////////////////////////////////
 
 class AgroXApp extends StatelessWidget {
   const AgroXApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: 'AgroX',
+
+      /// 🔥 GLOBAL UI FIX (RESPONSIVE CONTROL)
+      builder: (context, child) {
+        final data = MediaQuery.of(context);
+
+        return MediaQuery(
+          /// ❗ FIX TEXT SCALE (prevent font zoom issue)
+          data: data.copyWith(textScaler: const TextScaler.linear(1.0)),
+
+          child: Center(
+            child: ConstrainedBox(
+              /// ❗ MAX WIDTH FIX (same UI for all phones)
+              constraints: const BoxConstraints(maxWidth: 400),
+
+              child: Container(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: child!,
+              ),
+            ),
+          ),
+        );
+      },
+
+      /// 🔥 DARK / LIGHT MODE
+      themeMode: themeProvider.themeMode,
+
+      /// 🌞 LIGHT THEME
+      theme: ThemeData(
+        brightness: Brightness.light,
+        primaryColor: Colors.green,
+        scaffoldBackgroundColor: const Color(0xFFF8F9FA),
+
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.green,
+          brightness: Brightness.light,
+        ),
+
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          iconTheme: IconThemeData(color: Colors.black),
+          titleTextStyle: TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        cardColor: Colors.white,
+
+        useMaterial3: true,
+      ),
+
+      /// 🌙 DARK THEME
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: Colors.green,
+        scaffoldBackgroundColor: const Color(0xFF121212),
+
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.green,
+          brightness: Brightness.dark,
+        ),
+
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E1E1E),
+          elevation: 0,
+          iconTheme: IconThemeData(color: Colors.white),
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        cardColor: const Color(0xFF1E1E1E),
+
+        useMaterial3: true,
+      ),
 
       /// 🔥 ENTRY POINT
       home: const AuthWrapper(),
 
+      /// 🔥 ROUTES
       routes: {
         '/welcome': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignupPage(),
         '/home': (context) => const HomePage(),
+        '/profile': (context) => const ProfilePage(),
         '/reset-password': (context) => const ResetPasswordPage(),
       },
     );
@@ -44,7 +143,7 @@ class AgroXApp extends StatelessWidget {
 }
 
 ///////////////////////////////////////////////////////////////
-/// 🔥 AUTH WRAPPER (AUTO LOGIN SYSTEM)
+/// 🔥 AUTH WRAPPER (AUTO LOGIN + SPLASH)
 ///////////////////////////////////////////////////////////////
 
 class AuthWrapper extends StatefulWidget {
@@ -61,37 +160,40 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void initState() {
     super.initState();
 
-    /// Show splash 3 seconds
+    /// 🔥 SPLASH DELAY
     Future.delayed(const Duration(seconds: 3), () {
-      setState(() {
-        _showSplash = false;
-      });
+      if (mounted) {
+        setState(() {
+          _showSplash = false;
+        });
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    /// 🔥 Show splash first
+
+    /// 🔥 SHOW SPLASH FIRST
     if (_showSplash) {
       return const SplashPage();
     }
 
-    /// 🔥 Then listen auth state
+    /// 🔥 AUTH STATE LISTENER
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
 
-        /// Loading
+        /// 🔄 LOADING
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SplashPage();
         }
 
-        /// Logged in
+        /// ✅ USER LOGGED IN
         if (snapshot.hasData) {
           return const HomePage();
         }
 
-        /// Not logged
+        /// ❌ NOT LOGGED IN
         return const WelcomePage();
       },
     );
