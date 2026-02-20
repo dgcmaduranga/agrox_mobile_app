@@ -22,7 +22,6 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F7F9),
 
-      /// 🔥 APP BAR
       appBar: AppBar(
         backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
         elevation: 0,
@@ -40,193 +39,176 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
 
-      /// 🔥 FIXED SAFE AREA (IMPORTANT)
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
 
-              /// 🔥 PROFILE CARD
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                margin: const EdgeInsets.only(top: 10),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: Colors.green.shade200,
-                      child: Text(
-                        user?.email?[0].toUpperCase() ?? "U",
-                        style: const TextStyle(fontSize: 14),
-                      ),
+            /// PROFILE CARD
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              margin: const EdgeInsets.only(top: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: Colors.green.shade200,
+                    child: Text(
+                      user?.email?[0].toUpperCase() ?? "U",
+                      style: const TextStyle(fontSize: 14),
                     ),
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user?.displayName ?? "User",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : Colors.black,
-                            ),
-                          ),
-                          Text(
-                            user?.email ?? "",
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark ? Colors.grey : Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    GestureDetector(
-                      onTap: _showEditProfileDialog,
-                      child: Icon(Icons.edit,
-                          size: 18,
-                          color: isDark ? Colors.white : Colors.black),
-                    )
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              _sectionTitle("Account", isDark),
-
-              _tile(
-                icon: Icons.person,
-                title: "Edit Profile",
-                subtitle: "Update your details",
-                isDark: isDark,
-                onTap: _showEditProfileDialog,
-              ),
-
-              _tile(
-                icon: Icons.lock,
-                title: "Change Password",
-                subtitle: user?.email ?? "",
-                isDark: isDark,
-                onTap: _showResetDialog,
-              ),
-
-              const SizedBox(height: 6),
-
-              _sectionTitle("Settings", isDark),
-
-              _switchTile(
-                icon: Icons.dark_mode,
-                title: "Dark Mode",
-                value: isDark,
-                isDark: isDark,
-                onChanged: (v) {
-                  themeProvider.toggleTheme(v);
-                },
-              ),
-
-              _switchTile(
-                icon: Icons.notifications,
-                title: "Notifications",
-                value: _notifications,
-                isDark: isDark,
-                onChanged: (v) {
-                  setState(() => _notifications = v);
-                },
-              ),
-
-              const SizedBox(height: 4),
-
-              _sectionTitle("About", isDark),
-
-              /// 🔥 ABOUT CARD
-              Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 34,
-                      width: 34,
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.info,
-                          color: Colors.green, size: 18),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("AgroX",
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white : Colors.black)),
-                          const SizedBox(height: 2),
-                          Text("Version 1.0.0",
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark ? Colors.grey : Colors.black54)),
-                          const SizedBox(height: 2),
-                          Text("AI-powered agriculture assistant",
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark ? Colors.grey : Colors.black54)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              /// 🔥 LOGOUT
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
-                    Navigator.pushReplacementNamed(context, '/login');
-                  },
-                  child: const Text("Logout",
-                      style: TextStyle(color: Colors.white, fontSize: 14)),
-                ),
-              ),
+                  const SizedBox(width: 12),
 
-              /// 🔥 IMPORTANT FIX (BOTTOM SPACE)
-              const SizedBox(height: 20),
-            ],
-          ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.displayName ?? "User",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        Text(
+                          user?.email ?? "",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.grey : Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  GestureDetector(
+                    onTap: _showEditProfileDialog,
+                    child: Icon(Icons.edit,
+                        size: 18,
+                        color: isDark ? Colors.white : Colors.black),
+                  )
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            _sectionTitle("Account", isDark),
+
+            _tile(
+              icon: Icons.person,
+              title: "Edit Profile",
+              subtitle: "Update your details",
+              isDark: isDark,
+              onTap: _showEditProfileDialog,
+            ),
+
+            _tile(
+              icon: Icons.lock,
+              title: "Change Password",
+              subtitle: user?.email ?? "",
+              isDark: isDark,
+              onTap: _showResetDialog,
+            ),
+
+            const SizedBox(height: 6),
+
+            _sectionTitle("Settings", isDark),
+
+            /// 🔥 SAME SIZE (FIXED)
+            _switchTile(
+              icon: Icons.dark_mode,
+              title: "Dark Mode",
+              value: isDark,
+              isDark: isDark,
+              onChanged: (v) {
+                themeProvider.toggleTheme(v);
+              },
+            ),
+
+            _switchTile(
+              icon: Icons.notifications,
+              title: "Notifications",
+              value: _notifications,
+              isDark: isDark,
+              onChanged: (v) {
+                setState(() => _notifications = v);
+              },
+            ),
+
+            const SizedBox(height: 4),
+
+            _sectionTitle("About", isDark),
+
+            /// 🔥 SAME SIZE AS TILE (FIXED)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info, color: Colors.green, size: 18),
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("AgroX",
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : Colors.black)),
+                        Text("Version 1.0.0",
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? Colors.grey : Colors.black54)),
+                        Text("AI-powered agriculture assistant",
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? Colors.grey : Colors.black54)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            /// LOGOUT
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
+                  Navigator.pushReplacementNamed(context, '/login');
+                },
+                child: const Text("Logout",
+                    style: TextStyle(color: Colors.white, fontSize: 14)),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+          ],
         ),
       ),
 
-      /// 🔥 BOTTOM NAV
       bottomNavigationBar: BottomAppBar(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 8,
@@ -383,7 +365,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12), // SAME AS TILE
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
