@@ -14,7 +14,10 @@ import 'features/auth/reset_password_page.dart';
 import 'features/home/home_page.dart';
 import 'features/profile/profile_page.dart';
 
-// 🔥 THEME PROVIDER
+//  NEW (Knowledge Hub)
+import 'features/knowledge/knowledge_page.dart';
+
+//  THEME PROVIDER
 import 'services/theme_provider.dart';
 
 void main() async {
@@ -31,11 +34,6 @@ void main() async {
     ),
   );
 }
-
-///////////////////////////////////////////////////////////////
-/// 🔥 MAIN APP
-///////////////////////////////////////////////////////////////
-
 class AgroXApp extends StatelessWidget {
   const AgroXApp({super.key});
 
@@ -47,19 +45,15 @@ class AgroXApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'AgroX',
 
-      /// 🔥 GLOBAL UI FIX (RESPONSIVE CONTROL)
+      /// 🔥 GLOBAL UI FIX
       builder: (context, child) {
         final data = MediaQuery.of(context);
 
         return MediaQuery(
-          /// ❗ FIX TEXT SCALE (prevent font zoom issue)
           data: data.copyWith(textScaler: const TextScaler.linear(1.0)),
-
           child: Center(
             child: ConstrainedBox(
-              /// ❗ MAX WIDTH FIX (same UI for all phones)
               constraints: const BoxConstraints(maxWidth: 400),
-
               child: Container(
                 color: Theme.of(context).scaffoldBackgroundColor,
                 child: child!,
@@ -95,7 +89,6 @@ class AgroXApp extends StatelessWidget {
         ),
 
         cardColor: Colors.white,
-
         useMaterial3: true,
       ),
 
@@ -122,14 +115,13 @@ class AgroXApp extends StatelessWidget {
         ),
 
         cardColor: const Color(0xFF1E1E1E),
-
         useMaterial3: true,
       ),
 
-      /// 🔥 ENTRY POINT
+      ///  ENTRY POINT
       home: const AuthWrapper(),
 
-      /// 🔥 ROUTES
+      ///  ROUTES
       routes: {
         '/welcome': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
@@ -137,14 +129,13 @@ class AgroXApp extends StatelessWidget {
         '/home': (context) => const HomePage(),
         '/profile': (context) => const ProfilePage(),
         '/reset-password': (context) => const ResetPasswordPage(),
+
+        ///  NEW ROUTE
+        '/knowledge': (context) => const KnowledgePage(),
       },
     );
   }
 }
-
-///////////////////////////////////////////////////////////////
-/// 🔥 AUTH WRAPPER (AUTO LOGIN + SPLASH)
-///////////////////////////////////////////////////////////////
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -160,7 +151,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void initState() {
     super.initState();
 
-    /// 🔥 SPLASH DELAY
+    ///  SPLASH DELAY
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         setState(() {
@@ -173,27 +164,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
 
-    /// 🔥 SHOW SPLASH FIRST
+    ///  SHOW SPLASH FIRST
     if (_showSplash) {
       return const SplashPage();
     }
 
-    /// 🔥 AUTH STATE LISTENER
+    ///  AUTH STATE LISTENER
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
 
-        /// 🔄 LOADING
+        ///   LOADING
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SplashPage();
         }
 
-        /// ✅ USER LOGGED IN
+        ///  USER LOGGED IN
         if (snapshot.hasData) {
           return const HomePage();
         }
 
-        /// ❌ NOT LOGGED IN
+        ///  NOT LOGGED IN
         return const WelcomePage();
       },
     );
