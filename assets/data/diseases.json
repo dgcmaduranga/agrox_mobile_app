@@ -34,7 +34,13 @@
       "Avoid excess shade",
       "Ensure good drainage",
       "Regular monitoring"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 24,
+      "maxTemp": 30,
+      "minHumidity": 70,
+      "rainRequired": true
+    }
   },
 
   {
@@ -68,7 +74,13 @@
     "prevention": [
       "Maintain hygiene",
       "Proper spacing"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 25,
+      "maxTemp": 32,
+      "minHumidity": 75,
+      "rainRequired": true
+    }
   },
 
   {
@@ -101,7 +113,13 @@
     "prevention": [
       "Proper spacing",
       "Avoid water stagnation"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 24,
+      "maxTemp": 30,
+      "minHumidity": 80,
+      "rainRequired": true
+    }
   },
 
   {
@@ -134,7 +152,13 @@
     "prevention": [
       "Regular monitoring",
       "Pest management"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 26,
+      "maxTemp": 34,
+      "minHumidity": 60,
+      "rainRequired": false
+    }
   },
 
   {
@@ -166,7 +190,13 @@
     "prevention": [
       "Proper spacing",
       "Avoid excess shade"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 24,
+      "maxTemp": 31,
+      "minHumidity": 75,
+      "rainRequired": true
+    }
   },
 
   {
@@ -200,7 +230,13 @@
     "prevention": [
       "Proper drainage",
       "Balanced fertilizer"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 26,
+      "maxTemp": 34,
+      "minHumidity": 80,
+      "rainRequired": true
+    }
   },
 
   {
@@ -233,7 +269,13 @@
     "prevention": [
       "Balanced nutrients",
       "Proper spacing"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 25,
+      "maxTemp": 32,
+      "minHumidity": 75,
+      "rainRequired": true
+    }
   },
 
   {
@@ -267,7 +309,13 @@
     "prevention": [
       "Proper spacing",
       "Use resistant seeds"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 24,
+      "maxTemp": 30,
+      "minHumidity": 85,
+      "rainRequired": true
+    }
   },
 
   {
@@ -297,7 +345,13 @@
     ],
     "prevention": [
       "Maintain water levels"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 26,
+      "maxTemp": 34,
+      "minHumidity": 70,
+      "rainRequired": false
+    }
   },
 
   {
@@ -327,7 +381,13 @@
     ],
     "prevention": [
       "Proper spacing"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 25,
+      "maxTemp": 32,
+      "minHumidity": 85,
+      "rainRequired": true
+    }
   },
 
   {
@@ -362,7 +422,13 @@
     "prevention": [
       "Use healthy seedlings",
       "Maintain hygiene"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 27,
+      "maxTemp": 35,
+      "minHumidity": 60,
+      "rainRequired": false
+    }
   },
 
   {
@@ -393,7 +459,13 @@
     ],
     "prevention": [
       "Maintain soil health"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 27,
+      "maxTemp": 34,
+      "minHumidity": 65,
+      "rainRequired": false
+    }
   },
 
   {
@@ -425,7 +497,13 @@
     ],
     "prevention": [
       "Balanced nutrients"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 26,
+      "maxTemp": 34,
+      "minHumidity": 65,
+      "rainRequired": false
+    }
   },
 
   {
@@ -458,7 +536,13 @@
     ],
     "prevention": [
       "Regular monitoring"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 27,
+      "maxTemp": 35,
+      "minHumidity": 60,
+      "rainRequired": false
+    }
   },
 
   {
@@ -489,6 +573,12 @@
     ],
     "prevention": [
       "Maintain hygiene"
-    ]
+    ],
+    "riskConditions": {
+      "minTemp": 27,
+      "maxTemp": 34,
+      "minHumidity": 60,
+      "rainRequired": false
+    }
   }
 ]
