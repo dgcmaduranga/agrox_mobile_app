@@ -41,8 +41,17 @@ flutter:
   uses-material-design: true
 
   assets:
+    # 🔹 Main images
     - assets/images/logo.png
     - assets/images/welcome.png
     - assets/images/paddy.png
     - assets/images/tea.png
     - assets/images/coconut.png
+
+    # 🔹 Disease images (folders)
+    - assets/images/diseases/tea/
+    - assets/images/diseases/rice/
+    - assets/images/diseases/coconut/
+
+    # 🔹 JSON data
+    - assets/data/diseases.json

@@ -1,0 +1,494 @@
+[
+  {
+    "id": "algal_spot_tea",
+    "name": "Algal Spot",
+    "crop": "tea",
+    "image": "assets/images/diseases/tea/algal_spot.jpg",
+    "description": "Algal Spot (Red Rust) is a disease in tea plants characterized by orange or green patches on leaves. It reduces photosynthesis and overall leaf quality.",
+    "symptoms": [
+      "Green or orange patches on leaves",
+      "Rough circular spots",
+      "Reduced leaf quality",
+      "Leaf hardening"
+    ],
+    "causes": [
+      "Algal infection",
+      "High humidity",
+      "Excess shade",
+      "Poor air circulation"
+    ],
+    "highRiskTreatments": [
+      "Spray Bordeaux mixture",
+      "Spray copper oxychloride",
+      "Prune and burn infected branches",
+      "Reduce shade and improve sunlight"
+    ],
+    "lowRiskTreatments": [
+      "Remove infected leaves",
+      "Improve sunlight exposure",
+      "Reduce humidity",
+      "Maintain field cleanliness"
+    ],
+    "prevention": [
+      "Maintain proper spacing",
+      "Avoid excess shade",
+      "Ensure good drainage",
+      "Regular monitoring"
+    ]
+  },
+
+  {
+    "id": "brown_blight_tea",
+    "name": "Brown Blight",
+    "crop": "tea",
+    "image": "assets/images/diseases/tea/brown_blight.jpg",
+    "description": "Brown Blight is a fungal disease causing brown lesions and drying of tea leaves, reducing yield.",
+    "symptoms": [
+      "Brown spots",
+      "Leaf drying",
+      "Reduced growth"
+    ],
+    "causes": [
+      "Fungal infection",
+      "Warm humid conditions"
+    ],
+    "highRiskTreatments": [
+      "Remove infected leaves",
+      "Maintain clean plucking",
+      "Disinfect tools",
+      "Spray Trifloxystrobin",
+      "Spray Azoxystrobin"
+    ],
+    "lowRiskTreatments": [
+      "Remove affected leaves",
+      "Improve air circulation",
+      "Avoid overcrowding",
+      "Use organic fertilizer"
+    ],
+    "prevention": [
+      "Maintain hygiene",
+      "Proper spacing"
+    ]
+  },
+
+  {
+    "id": "gray_blight_tea",
+    "name": "Gray Blight",
+    "crop": "tea",
+    "image": "assets/images/diseases/tea/gray_blight.jpg",
+    "description": "Gray Blight causes grayish lesions on tea leaves leading to leaf fall and reduced production.",
+    "symptoms": [
+      "Gray spots",
+      "Leaf discoloration",
+      "Leaf fall"
+    ],
+    "causes": [
+      "Fungal infection",
+      "High humidity"
+    ],
+    "highRiskTreatments": [
+      "Remove infected leaves",
+      "Maintain sanitation",
+      "Improve drainage",
+      "Spray copper fungicides"
+    ],
+    "lowRiskTreatments": [
+      "Prune infected parts",
+      "Increase spacing",
+      "Improve drainage",
+      "Apply compost"
+    ],
+    "prevention": [
+      "Proper spacing",
+      "Avoid water stagnation"
+    ]
+  },
+
+  {
+    "id": "helopeltis_tea",
+    "name": "Helopeltis",
+    "crop": "tea",
+    "image": "assets/images/diseases/tea/helopeltis.jpg",
+    "description": "Helopeltis is an insect pest that damages tea leaves and buds causing yield loss.",
+    "symptoms": [
+      "Brown lesions",
+      "Leaf curling",
+      "Reduced yield"
+    ],
+    "causes": [
+      "Insect attack"
+    ],
+    "highRiskTreatments": [
+      "Encourage natural predators",
+      "Use neem-based sprays",
+      "Use botanical insecticides",
+      "Spray Dimethoate",
+      "Spray Profenofos"
+    ],
+    "lowRiskTreatments": [
+      "Remove affected shoots",
+      "Spray neem oil",
+      "Encourage beneficial insects",
+      "Keep plants clean"
+    ],
+    "prevention": [
+      "Regular monitoring",
+      "Pest management"
+    ]
+  },
+
+  {
+    "id": "red_spot_tea",
+    "name": "Red Spot",
+    "crop": "tea",
+    "image": "assets/images/diseases/tea/red_spot.jpg",
+    "description": "Red Spot causes red or brown spots on tea leaves affecting leaf quality.",
+    "symptoms": [
+      "Red spots",
+      "Leaf damage",
+      "Reduced quality"
+    ],
+    "causes": [
+      "Fungal infection"
+    ],
+    "highRiskTreatments": [
+      "Spray Bordeaux mixture",
+      "Spray copper fungicides",
+      "Remove infected leaves",
+      "Improve air circulation"
+    ],
+    "lowRiskTreatments": [
+      "Remove infected leaves",
+      "Improve ventilation",
+      "Avoid excessive shade",
+      "Maintain field hygiene"
+    ],
+    "prevention": [
+      "Proper spacing",
+      "Avoid excess shade"
+    ]
+  },
+
+  {
+    "id": "bacterial_leaf_blight_rice",
+    "name": "Bacterial Leaf Blight",
+    "crop": "rice",
+    "image": "assets/images/diseases/rice/bacterial_leaf_blight.jpg",
+    "description": "Bacterial Leaf Blight causes yellowing and drying of rice leaves leading to yield loss.",
+    "symptoms": [
+      "Yellow leaves",
+      "Dry tips",
+      "Reduced yield"
+    ],
+    "causes": [
+      "Bacterial infection"
+    ],
+    "highRiskTreatments": [
+      "Use resistant varieties",
+      "Apply balanced fertilizer",
+      "Maintain proper drainage",
+      "Follow nitrogen levels",
+      "Maintain field hygiene"
+    ],
+    "lowRiskTreatments": [
+      "Avoid water stagnation",
+      "Use clean irrigation water",
+      "Remove infected plants",
+      "Maintain hygiene",
+      "Use compost"
+    ],
+    "prevention": [
+      "Proper drainage",
+      "Balanced fertilizer"
+    ]
+  },
+
+  {
+    "id": "brown_spot_rice",
+    "name": "Brown Spot",
+    "crop": "rice",
+    "image": "assets/images/diseases/rice/brown_spot.jpg",
+    "description": "Brown Spot causes brown lesions and reduces rice yield.",
+    "symptoms": [
+      "Brown circular spots",
+      "Yellow leaves"
+    ],
+    "causes": [
+      "Fungal infection"
+    ],
+    "highRiskTreatments": [
+      "Apply compost",
+      "Apply potassium and zinc fertilizers",
+      "Use certified seeds",
+      "Spray Mancozeb",
+      "Spray Carbendazim"
+    ],
+    "lowRiskTreatments": [
+      "Remove infected leaves",
+      "Avoid excess nitrogen",
+      "Improve drainage",
+      "Use compost",
+      "Maintain spacing"
+    ],
+    "prevention": [
+      "Balanced nutrients",
+      "Proper spacing"
+    ]
+  },
+
+  {
+    "id": "leaf_blast_rice",
+    "name": "Leaf Blast",
+    "crop": "rice",
+    "image": "assets/images/diseases/rice/leaf_blast.jpg",
+    "description": "Leaf Blast is a serious fungal disease affecting rice crops.",
+    "symptoms": [
+      "Diamond shaped spots",
+      "Leaf drying"
+    ],
+    "causes": [
+      "Fungal infection"
+    ],
+    "highRiskTreatments": [
+      "Use resistant varieties",
+      "Avoid excess nitrogen",
+      "Maintain spacing",
+      "Spray Tricyclazole",
+      "Spray Tebuconazole",
+      "Treat seeds with Carbendazim"
+    ],
+    "lowRiskTreatments": [
+      "Remove affected leaves",
+      "Reduce nitrogen",
+      "Improve airflow",
+      "Use organic fertilizers",
+      "Avoid overwatering"
+    ],
+    "prevention": [
+      "Proper spacing",
+      "Use resistant seeds"
+    ]
+  },
+
+  {
+    "id": "leaf_scald_rice",
+    "name": "Leaf Scald",
+    "crop": "rice",
+    "image": "assets/images/diseases/rice/leaf_scald.jpg",
+    "description": "Leaf Scald causes drying and burning of rice leaves.",
+    "symptoms": [
+      "Dry edges",
+      "White patches"
+    ],
+    "causes": [
+      "Fungal infection"
+    ],
+    "highRiskTreatments": [
+      "Apply fungicide spray",
+      "Improve drainage",
+      "Balanced fertilization",
+      "Use disease-resistant seeds"
+    ],
+    "lowRiskTreatments": [
+      "Remove dry leaves",
+      "Ensure irrigation",
+      "Improve nutrients",
+      "Maintain hygiene"
+    ],
+    "prevention": [
+      "Maintain water levels"
+    ]
+  },
+
+  {
+    "id": "sheath_blight_rice",
+    "name": "Sheath Blight",
+    "crop": "rice",
+    "image": "assets/images/diseases/rice/sheath_blight.jpg",
+    "description": "Sheath Blight affects rice stems and reduces yield.",
+    "symptoms": [
+      "Lesions on sheath",
+      "Leaf damage"
+    ],
+    "causes": [
+      "Fungal infection"
+    ],
+    "highRiskTreatments": [
+      "Spray validamycin fungicide",
+      "Reduce nitrogen",
+      "Maintain spacing",
+      "Improve drainage"
+    ],
+    "lowRiskTreatments": [
+      "Remove infected parts",
+      "Reduce density",
+      "Improve airflow",
+      "Keep field clean"
+    ],
+    "prevention": [
+      "Proper spacing"
+    ]
+  },
+
+  {
+    "id": "wclwd_drying_coconut",
+    "name": "WCLWD Drying",
+    "crop": "coconut",
+    "image": "assets/images/diseases/coconut/wclwd_drying.jpg",
+    "description": "WCLWD Drying causes drying of coconut leaves and can lead to plant death.",
+    "symptoms": [
+      "Drying leaves",
+      "Yellowing",
+      "Weak plant"
+    ],
+    "causes": [
+      "Disease infection",
+      "Insect vectors"
+    ],
+    "highRiskTreatments": [
+      "Cut and burn infected palms",
+      "Inject glyphosate",
+      "Inject glufosinate",
+      "Control insect vectors",
+      "Use disease-free plants",
+      "Maintain quarantine zone"
+    ],
+    "lowRiskTreatments": [
+      "Trim dried leaves",
+      "Improve watering",
+      "Use organic compost",
+      "Check soil moisture"
+    ],
+    "prevention": [
+      "Use healthy seedlings",
+      "Maintain hygiene"
+    ]
+  },
+
+  {
+    "id": "wclwd_flaccidity_coconut",
+    "name": "WCLWD Flaccidity",
+    "crop": "coconut",
+    "image": "assets/images/diseases/coconut/wclwd_flaccidity.jpg",
+    "description": "WCLWD Flaccidity causes drooping and weakening of coconut leaves.",
+    "symptoms": [
+      "Drooping leaves",
+      "Weak structure"
+    ],
+    "causes": [
+      "Disease infection"
+    ],
+    "highRiskTreatments": [
+      "Destroy infected trees",
+      "Inject glyphosate",
+      "Control insect vectors",
+      "Maintain tools",
+      "Replace seedlings"
+    ],
+    "lowRiskTreatments": [
+      "Ensure irrigation",
+      "Improve drainage",
+      "Add organic matter",
+      "Monitor palms"
+    ],
+    "prevention": [
+      "Maintain soil health"
+    ]
+  },
+
+  {
+    "id": "wclwd_yellowing_coconut",
+    "name": "WCLWD Yellowing",
+    "crop": "coconut",
+    "image": "assets/images/diseases/coconut/wclwd_yellowing.jpg",
+    "description": "WCLWD Yellowing causes yellow leaves and reduced growth.",
+    "symptoms": [
+      "Yellow leaves",
+      "Weak growth"
+    ],
+    "causes": [
+      "Disease infection",
+      "Nutrient deficiency"
+    ],
+    "highRiskTreatments": [
+      "Cut and burn infected palms",
+      "Inject glyphosate",
+      "Control insect vectors",
+      "Remove infected leaves",
+      "Use certified seedlings"
+    ],
+    "lowRiskTreatments": [
+      "Apply compost",
+      "Improve soil nutrients",
+      "Water regularly",
+      "Remove weak leaves"
+    ],
+    "prevention": [
+      "Balanced nutrients"
+    ]
+  },
+
+  {
+    "id": "cci_caterpillars_coconut",
+    "name": "CCI Caterpillars",
+    "crop": "coconut",
+    "image": "assets/images/diseases/coconut/cci_caterpillars.jpg",
+    "description": "CCI Caterpillars damage coconut leaves and reduce growth.",
+    "symptoms": [
+      "Holes in leaves",
+      "Leaf damage"
+    ],
+    "causes": [
+      "Pest attack"
+    ],
+    "highRiskTreatments": [
+      "Cut and burn infested fronds",
+      "Release parasitoids",
+      "Spray neem oil",
+      "Inject Monocrotophos",
+      "Inject Carbosulfan",
+      "Spray Acetamiprid",
+      "Inform agriculture officer"
+    ],
+    "lowRiskTreatments": [
+      "Remove leaves manually",
+      "Spray neem oil",
+      "Encourage predators",
+      "Maintain cleanliness"
+    ],
+    "prevention": [
+      "Regular monitoring"
+    ]
+  },
+
+  {
+    "id": "cci_leaflets_coconut",
+    "name": "CCI Leaflets",
+    "crop": "coconut",
+    "image": "assets/images/diseases/coconut/cci_leaflets.jpg",
+    "description": "CCI Leaflets damage affects coconut leaves due to pests.",
+    "symptoms": [
+      "Damaged leaflets",
+      "Yellowing"
+    ],
+    "causes": [
+      "Pest attack"
+    ],
+    "highRiskTreatments": [
+      "Remove damaged leaves",
+      "Hand pick caterpillars",
+      "Spray neem oil",
+      "Spray Bacillus thuringiensis",
+      "Spray Carbosulfan"
+    ],
+    "lowRiskTreatments": [
+      "Cut infected leaflets",
+      "Improve sunlight",
+      "Maintain watering",
+      "Apply fertilizer"
+    ],
+    "prevention": [
+      "Maintain hygiene"
+    ]
+  }
+]
