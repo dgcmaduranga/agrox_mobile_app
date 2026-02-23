@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,6 +23,18 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = -1;
   bool _isFabPressed = false;
 
+  // === Risk alert state ===
+  List allDiseases = [];
+  String riskText = "Checking risk...";
+  Color riskColor = Colors.orange;
+  IconData riskIcon = Icons.warning_amber_rounded;
+
+  /// 🔥 WEATHER DATA
+  Map<String, dynamic>? weather;
+  bool isLoading = true;
+
+  final String apiKey = "YOUR_API_KEY";
+
   final List<String> images = [
     "assets/images/paddy.png",
     "assets/images/tea.png",
@@ -35,6 +51,11 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+
+    loadDiseases().then((_) {
+      print('Loaded ${allDiseases.length} diseases');
+      loadWeather();
+    });
 
     Timer.periodic(const Duration(seconds: 3), (timer) {
       if (!mounted) return;
@@ -62,6 +83,168 @@ class _HomePageState extends State<HomePage> {
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
       );
+      // Recalculate risk for the currently visible crop
+      calculateRisk();
+    });
+  }
+
+  ///////////////////////////////////////////////////////////////
+  /// 🔥 GET LOCATION + WEATHER
+  ///////////////////////////////////////////////////////////////
+
+  Future<void> loadWeather() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever) return;
+
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+
+      final url =
+          "https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=6abdd1bf33168b9143043b4256d589e8&units=metric";
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        setState(() {
+          weather = {
+            "temp": data['main']['temp'].round(),
+            "humidity": data['main']['humidity'],
+            "rain": data['rain'] != null
+                ? data['rain']['1h'] ?? 0
+                : 0,
+            "city": data['name'],
+          };
+          isLoading = false;
+        });
+        calculateRisk();
+      }
+    } catch (e) {
+      print(e);
+
+      ///  FALLBACK COLOMBO
+      final url =
+          "https://api.openweathermap.org/data/2.5/weather?q=Colombo&appid=6abdd1bf33168b9143043b4256d589e8&units=metric";
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        setState(() {
+          weather = {
+            "temp": data['main']['temp'].round(),
+            "humidity": data['main']['humidity'],
+            "rain": data['rain'] != null
+                ? data['rain']['1h'] ?? 0
+                : 0,
+            "city": data['name'],
+          };
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Load diseases JSON from assets
+  Future<void> loadDiseases() async {
+    try {
+      final String response =
+          await rootBundle.loadString('assets/data/diseases.json');
+      final data = json.decode(response);
+
+      setState(() {
+        allDiseases = data;
+      });
+    } catch (e) {
+      print('Failed to load diseases.json: $e');
+    }
+  }
+
+  // Evaluate all diseases against current weather and build a risk alert
+  void calculateRisk() {
+    if (weather == null || allDiseases.isEmpty) return;
+
+    final double tempVal = (weather!['temp'] is int)
+        ? (weather!['temp'] as int).toDouble()
+        : (weather!['temp'] as double? ?? 0.0);
+    final int humidityVal = (weather!['humidity'] as int?) ?? 0;
+    final double rainVal = (weather!['rain'] is int)
+        ? (weather!['rain'] as int).toDouble()
+        : (weather!['rain'] as double? ?? 0.0);
+
+    final String selectedCrop = images.isNotEmpty
+        ? images[_currentIndex].split('/').last.split('.').first.toLowerCase()
+        : '';
+
+    int bestScore = -1;
+    String bestDisease = '';
+
+    for (var d in allDiseases) {
+      final risk = d['riskConditions'];
+      if (risk == null) continue;
+
+      // Crop-based filtering: check `crop` or `crops` fields if present
+      final cropField = d['crop'];
+      final cropsField = d['crops'];
+      if (cropField != null) {
+        if (cropField.toString().toLowerCase() != selectedCrop) continue;
+      } else if (cropsField != null && cropsField is List) {
+        final lower = cropsField.map((e) => e.toString().toLowerCase()).toList();
+        if (!lower.contains(selectedCrop)) continue;
+      }
+
+      final int minT = (risk['minTemp'] as num?)?.toInt() ?? -999;
+      final int maxT = (risk['maxTemp'] as num?)?.toInt() ?? 999;
+      final int minH = (risk['minHumidity'] as num?)?.toInt() ?? 0;
+      final bool needRain = (risk['rainRequired'] == true);
+
+      final bool tempOk = tempVal >= minT && tempVal <= maxT;
+      final bool humidityOk = humidityVal >= minH;
+      final bool rainOk = !needRain || rainVal > 0;
+
+      int score = 0;
+      if (tempOk) score++;
+      if (humidityOk) score++;
+      if (rainOk) score++;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestDisease = d['name'] ?? 'Unknown';
+      }
+    }
+
+    setState(() {
+      if (bestScore <= 0) {
+        // No meaningful match
+        riskText = "Low Risk";
+        riskColor = Colors.green;
+        riskIcon = Icons.check_circle;
+      } else if (bestScore == 1) {
+        // Barely matching
+        riskText = "Low Risk for $bestDisease";
+        riskColor = Colors.green;
+        riskIcon = Icons.check_circle;
+      } else if (bestScore == 2) {
+        // Partial match
+        riskText = "Medium Risk for $bestDisease";
+        riskColor = const Color.fromARGB(255, 232, 120, 46);
+        riskIcon = Icons.warning_amber_rounded;
+      } else {
+        // Full match
+        riskText = "High Risk for $bestDisease";
+        riskColor = Colors.red;
+        riskIcon = Icons.warning;
+      }
     });
   }
 
@@ -69,16 +252,13 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
-    /// 🔥 DARK MODE FLAG
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      /// 🔥 FIXED BACKGROUND
       backgroundColor: isDark
           ? const Color(0xFF121212)
           : const Color.fromARGB(255, 248, 247, 247),
 
-      /// 🔥 CENTER BUTTON
       floatingActionButton: GestureDetector(
         onTapDown: (_) => setState(() => _isFabPressed = true),
         onTapUp: (_) {
@@ -167,56 +347,63 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 20),
 
-              /// WEATHER
+              /// 🔥 WEATHER UPDATED
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
                 ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _WeatherItem(icon: Icons.thermostat, text: "28°C"),
-                    _WeatherItem(icon: Icons.water_drop, text: "76%"),
-                    _WeatherItem(icon: Icons.grain, text: "1.2 mm"),
-                  ],
-                ),
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _WeatherItem(
+                              icon: Icons.location_on,
+                              text: weather!['city']),
+                          _WeatherItem(
+                              icon: Icons.thermostat,
+                              text: "${weather!['temp']}°C"),
+                          _WeatherItem(
+                              icon: Icons.water_drop,
+                              text: "${weather!['humidity']}%"),
+                          _WeatherItem(
+                              icon: Icons.grain,
+                              text: "${weather!['rain']} mm"),
+                        ],
+                      ),
               ),
 
               const SizedBox(height: 14),
 
-              /// ALERT
+              /// RISK ALERT
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.orange.shade100,
-                      Colors.yellow.shade100,
-                    ],
-                  ),
+                  color: riskColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                    SizedBox(width: 10),
-                    Expanded(child: Text("High Risk for Brown Spot")),
+                    Icon(riskIcon, color: riskColor),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        riskText,
+                        style: TextStyle(
+                          color: riskColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
 
               const SizedBox(height: 18),
 
-              /// CAROUSEL
+              /// CAROUSEL (same)
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: SizedBox(
@@ -262,7 +449,6 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 10),
 
-              /// DOTS
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(images.length, (index) {
@@ -304,7 +490,6 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
 
-      /// 🔥 FIXED (DARK MODE SUPPORT)
       bottomNavigationBar: BottomAppBar(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 8,
