@@ -14,15 +14,16 @@ import 'features/auth/reset_password_page.dart';
 import 'features/home/home_page.dart';
 import 'features/profile/profile_page.dart';
 
-//  NEW (Knowledge Hub)
+// Knowledge Hub
 import 'features/knowledge/knowledge_page.dart';
 
-//  THEME PROVIDER
+// Theme
 import 'services/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  /// 🔥 FIREBASE INIT
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -34,6 +35,7 @@ void main() async {
     ),
   );
 }
+
 class AgroXApp extends StatelessWidget {
   const AgroXApp({super.key});
 
@@ -45,7 +47,7 @@ class AgroXApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'AgroX',
 
-      /// 🔥 GLOBAL UI FIX
+      /// 🔥 GLOBAL UI (CENTERED MOBILE SIZE)
       builder: (context, child) {
         final data = MediaQuery.of(context);
 
@@ -63,10 +65,12 @@ class AgroXApp extends StatelessWidget {
         );
       },
 
-      /// 🔥 DARK / LIGHT MODE
+      /// 🔥 THEME MODE
       themeMode: themeProvider.themeMode,
 
+      ///////////////////////////////////////////////////////////////
       /// 🌞 LIGHT THEME
+      ///////////////////////////////////////////////////////////////
       theme: ThemeData(
         brightness: Brightness.light,
         primaryColor: Colors.green,
@@ -92,7 +96,9 @@ class AgroXApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
+      ///////////////////////////////////////////////////////////////
       /// 🌙 DARK THEME
+      ///////////////////////////////////////////////////////////////
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         primaryColor: Colors.green,
@@ -118,10 +124,14 @@ class AgroXApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
-      ///  ENTRY POINT
+      ///////////////////////////////////////////////////////////////
+      /// 🔥 ENTRY
+      ///////////////////////////////////////////////////////////////
       home: const AuthWrapper(),
 
-      ///  ROUTES
+      ///////////////////////////////////////////////////////////////
+      /// 🔥 ROUTES
+      ///////////////////////////////////////////////////////////////
       routes: {
         '/welcome': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
@@ -130,12 +140,19 @@ class AgroXApp extends StatelessWidget {
         '/profile': (context) => const ProfilePage(),
         '/reset-password': (context) => const ResetPasswordPage(),
 
-        ///  NEW ROUTE
+        /// 🔥 KNOWLEDGE HUB
         '/knowledge': (context) => const KnowledgePage(),
+
+        /// 🔥 FUTURE (AI CHATBOT READY)
+        // '/chatbot': (context) => const ChatbotPage(),
       },
     );
   }
 }
+
+///////////////////////////////////////////////////////////////
+/// 🔐 AUTH WRAPPER
+///////////////////////////////////////////////////////////////
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -151,7 +168,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void initState() {
     super.initState();
 
-    ///  SPLASH DELAY
+    /// 🔥 SPLASH DELAY
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         setState(() {
@@ -164,27 +181,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
 
-    ///  SHOW SPLASH FIRST
+    /// 🔥 SHOW SPLASH FIRST
     if (_showSplash) {
       return const SplashPage();
     }
 
-    ///  AUTH STATE LISTENER
+    /// 🔥 AUTH STATE LISTENER
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
 
-        ///   LOADING
+        /// 🔄 LOADING
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SplashPage();
         }
 
-        ///  USER LOGGED IN
+        /// ✅ LOGGED IN
         if (snapshot.hasData) {
           return const HomePage();
         }
 
-        ///  NOT LOGGED IN
+        /// ❌ NOT LOGGED IN
         return const WelcomePage();
       },
     );
