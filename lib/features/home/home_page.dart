@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,7 +34,7 @@ class _HomePageState extends State<HomePage> {
   Map<String, dynamic>? weather;
   bool isLoading = true;
 
-  final String apiKey = "YOUR_API_KEY";
+  final String apiKey = dotenv.env['OPENWEATHER_API_KEY'] ?? 'YOUR_API_KEY';
 
   final List<String> images = [
     "assets/images/paddy.png",
@@ -107,8 +108,8 @@ class _HomePageState extends State<HomePage> {
       Position position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
-      final url =
-          "https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=6abdd1bf33168b9143043b4256d589e8&units=metric";
+        final url =
+          "https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$apiKey&units=metric";
 
       final response = await http.get(Uri.parse(url));
 
@@ -132,8 +133,8 @@ class _HomePageState extends State<HomePage> {
       print(e);
 
       ///  FALLBACK COLOMBO
-      final url =
-          "https://api.openweathermap.org/data/2.5/weather?q=Colombo&appid=6abdd1bf33168b9143043b4256d589e8&units=metric";
+        final url =
+          "https://api.openweathermap.org/data/2.5/weather?q=Colombo&appid=$apiKey&units=metric";
 
       final response = await http.get(Uri.parse(url));
 
