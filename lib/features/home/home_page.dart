@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:html' as html; // For browser geolocation
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
+import '../../services/weather_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,6 +18,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final PageController _pageController = PageController();
+  Timer? _carouselTimer;
 
   int _currentIndex = 0;
   int _bottomIndex = 0;
@@ -34,7 +37,7 @@ class _HomePageState extends State<HomePage> {
   Map<String, dynamic>? weather;
   bool isLoading = true;
 
-  final String apiKey = dotenv.env['OPENWEATHER_API_KEY'] ?? 'YOUR_API_KEY';
+  // No API keys in the Flutter app. Weather comes from backend.
 
   final List<String> images = [
     "assets/images/paddy.png",
@@ -54,11 +57,11 @@ class _HomePageState extends State<HomePage> {
     super.initState();
 
     loadDiseases().then((_) {
-      print('Loaded ${allDiseases.length} diseases');
-      loadWeather();
+      // After diseases loaded, fetch location & weather
+      loadData();
     });
 
-    Timer.periodic(const Duration(seconds: 3), (timer) {
+    _carouselTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (!mounted) return;
 
       setState(() {
@@ -79,88 +82,197 @@ class _HomePageState extends State<HomePage> {
         }
       });
 
-      _pageController.animateToPage(
-        _currentIndex,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          _currentIndex,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+
       // Recalculate risk for the currently visible crop
       calculateRisk();
     });
+  }
+
+  @override
+  void dispose() {
+    _carouselTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
   }
 
   ///////////////////////////////////////////////////////////////
   /// 🔥 GET LOCATION + WEATHER
   ///////////////////////////////////////////////////////////////
 
-  Future<void> loadWeather() async {
+  // Orchestrator: get coords, fetch weather, reverse geocode place name
+  Future<void> loadData() async {
+    setState(() {
+      isLoading = true;
+      riskText = "Checking risk...";
+    });
+
+    // Default fallback coords (Colombo)
+    double lat = 6.927079;
+    double lon = 79.861244;
+
+    // 1) Try to get coordinates
+    final coords = await getLocation();
+    if (coords != null) {
+      lat = coords['lat']!.toDouble();
+      lon = coords['lon']!.toDouble();
+    }
+
+    // 2) Fetch weather from backend via fetchWeather wrapper
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.deniedForever) return;
-
-      Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
-
-        final url =
-          "https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&appid=$apiKey&units=metric";
-
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
+      final data = await fetchWeather(lat, lon);
+      if (data != null) {
         setState(() {
           weather = {
-            "temp": data['main']['temp'].round(),
-            "humidity": data['main']['humidity'],
-            "rain": data['rain'] != null
-                ? data['rain']['1h'] ?? 0
-                : 0,
-            "city": data['name'],
+            'temp': (data['temp'] is num) ? (data['temp'] as num).round() : data['temp'],
+            'humidity': (data['humidity'] is num) ? (data['humidity'] as num).toInt() : data['humidity'],
+            'rain': 0,
+            'city': 'Current Location', // will be replaced by reverse geocode below if available
+            'condition': data['condition'] ?? '',
+          };
+        });
+
+        // 3) Reverse geocode to human-readable location name
+        final locName = await fetchLocationName(lat, lon);
+        setState(() {
+          weather = {
+            ...?weather,
+            'city': locName ?? 'Current Location',
           };
           isLoading = false;
         });
+
         calculateRisk();
+      } else {
+        // fetchWeather returned null
+        setState(() {
+          weather = {
+            'temp': 0,
+            'humidity': 0,
+            'rain': 0,
+            'city': 'Current Location',
+            'condition': '',
+          };
+          isLoading = false;
+        });
       }
     } catch (e) {
-      print(e);
+      print('Weather load failed: $e');
+      setState(() {
+        weather = {
+          'temp': 0,
+          'humidity': 0,
+          'rain': 0,
+          'city': 'Current Location',
+          'condition': '',
+        };
+        isLoading = false;
+      });
+    }
+  }
 
-      ///  FALLBACK COLOMBO
-        final url =
-          "https://api.openweathermap.org/data/2.5/weather?q=Colombo&appid=$apiKey&units=metric";
+  // Returns {'lat': .., 'lon': ..} or null if unavailable.
+  // Public wrapper named `getLocation` per requirements.
+  Future<Map<String, double>?> getLocation() async {
+    return await getLocationCoordinates();
+  }
 
-      final response = await http.get(Uri.parse(url));
+  Future<Map<String, double>?> getLocationCoordinates() async {
+    try {
+      if (kIsWeb) {
+        final completer = Completer<Map<String, double>?>();
+        try {
+          final geo = html.window.navigator.geolocation;
+          if (geo == null) {
+            completer.complete(null);
+          } else {
+            geo.getCurrentPosition().then((pos) {
+              final latNum = pos.coords?.latitude ?? 0.0;
+              final lonNum = pos.coords?.longitude ?? 0.0;
+              completer.complete({'lat': (latNum is num) ? latNum.toDouble() : double.parse(latNum.toString()), 'lon': (lonNum is num) ? lonNum.toDouble() : double.parse(lonNum.toString())});
+            }).catchError((err) {
+              print('Browser geolocation error: $err');
+              completer.complete(null);
+            });
+          }
+        } catch (e) {
+          print('Browser geolocation exception: $e');
+          completer.complete(null);
+        }
+        return completer.future;
+      } else {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) return null;
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
+          return null;
+        }
 
-        setState(() {
-          weather = {
-            "temp": data['main']['temp'].round(),
-            "humidity": data['main']['humidity'],
-            "rain": data['rain'] != null
-                ? data['rain']['1h'] ?? 0
-                : 0,
-            "city": data['name'],
-          };
-          isLoading = false;
-        });
+        final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+        final double plat = (pos.latitude is num) ? pos.latitude.toDouble() : double.parse(pos.latitude.toString());
+        final double plon = (pos.longitude is num) ? pos.longitude.toDouble() : double.parse(pos.longitude.toString());
+        return {'lat': plat, 'lon': plon};
       }
+    } catch (e) {
+      print('getLocationCoordinates failed: $e');
+      return null;
+    }
+  }
+
+  // Fetch weather using backend endpoint; returns normalized map or null on failure.
+  Future<Map<String, dynamic>?> fetchWeather(double lat, double lon) async {
+    try {
+      final backend = WeatherService();
+      final data = await backend.getWeather(lat, lon);
+
+      // Normalize keys to our local shape
+      return {
+        'temp': (data['temp'] is num) ? (data['temp'] as num).toDouble() : (double.tryParse(data['temp']?.toString() ?? '') ?? 0.0),
+        'humidity': (data['humidity'] is num) ? (data['humidity'] as num).toInt() : int.tryParse(data['humidity']?.toString() ?? '') ?? 0,
+        'condition': data['condition'] ?? '',
+      };
+    } catch (e) {
+      print('fetchWeather error: $e');
+      return null;
+    }
+  }
+
+  // Reverse geocode using OpenStreetMap Nominatim (free). Best-effort.
+  Future<String?> fetchLocationName(double lat, double lon) async {
+    try {
+      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon');
+      final resp = await http.get(url, headers: {'User-Agent': 'AgroX-App/1.0'});
+      if (resp.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(resp.body);
+        final addr = data['address'] as Map<String, dynamic>?;
+        String? name;
+        if (addr != null) {
+          name = addr['city'] as String? ?? addr['town'] as String? ?? addr['village'] as String? ?? addr['county'] as String?;
+        }
+        name = name ?? (data['display_name'] as String?)?.split(',').first;
+        return name;
+      }
+      return null;
+    } catch (e) {
+      print('fetchLocationName error: $e');
+      return null;
     }
   }
 
   // Load diseases JSON from assets
   Future<void> loadDiseases() async {
     try {
-      final String response =
-          await rootBundle.loadString('assets/data/diseases.json');
+      final String response = await rootBundle.loadString('assets/data/diseases.json');
       final data = json.decode(response);
 
       setState(() {
@@ -175,13 +287,16 @@ class _HomePageState extends State<HomePage> {
   void calculateRisk() {
     if (weather == null || allDiseases.isEmpty) return;
 
-    final double tempVal = (weather!['temp'] is int)
-        ? (weather!['temp'] as int).toDouble()
-        : (weather!['temp'] as double? ?? 0.0);
-    final int humidityVal = (weather!['humidity'] as int?) ?? 0;
-    final double rainVal = (weather!['rain'] is int)
-        ? (weather!['rain'] as int).toDouble()
-        : (weather!['rain'] as double? ?? 0.0);
+    // Cast once to a non-null map to avoid repeated null checks.
+    final Map<String, dynamic> w = weather as Map<String, dynamic>;
+
+    final double tempVal = (w['temp'] is int)
+        ? (w['temp'] as int).toDouble()
+        : (w['temp'] as double? ?? 0.0);
+    final int humidityVal = (w['humidity'] as int?) ?? 0;
+    final double rainVal = (w['rain'] is int)
+        ? (w['rain'] as int).toDouble()
+        : (w['rain'] as double? ?? 0.0);
 
     final String selectedCrop = images.isNotEmpty
         ? images[_currentIndex].split('/').last.split('.').first.toLowerCase()
@@ -362,16 +477,16 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           _WeatherItem(
                               icon: Icons.location_on,
-                              text: weather!['city']),
+                              text: "${weather?['city'] ?? ''}"),
                           _WeatherItem(
                               icon: Icons.thermostat,
-                              text: "${weather!['temp']}°C"),
+                              text: "${weather?['temp'] ?? ''}°C"),
                           _WeatherItem(
                               icon: Icons.water_drop,
-                              text: "${weather!['humidity']}%"),
+                              text: "${weather?['humidity'] ?? ''}%"),
                           _WeatherItem(
-                              icon: Icons.grain,
-                              text: "${weather!['rain']} mm"),
+                              icon: Icons.cloud,
+                              text: "${weather?['condition'] ?? ''}"),
                         ],
                       ),
               ),

@@ -14,7 +14,6 @@ class _SplashPageState extends State<SplashPage>
 
   late AnimationController _controller;
   late Animation<Offset> _logoAnimation;
-  late Animation<Offset> _textAnimation;
   late Animation<double> _fadeAnimation;
 
   @override
@@ -27,20 +26,18 @@ class _SplashPageState extends State<SplashPage>
       duration: const Duration(milliseconds: 1200),
     );
 
+    /// 🔥 LOGO slide from bottom to center
     _logoAnimation = Tween<Offset>(
-      begin: const Offset(0, -1.2),
+      begin: const Offset(0, 1.3), // start below screen
       end: Offset.zero,
     ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutBack, // smooth pop effect
+      ),
     );
 
-    _textAnimation = Tween<Offset>(
-      begin: const Offset(0, 1.2),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-
+    /// Fade animation
     _fadeAnimation = Tween<double>(
       begin: 0,
       end: 1,
@@ -56,7 +53,7 @@ class _SplashPageState extends State<SplashPage>
 
   /// 🔥 Navigate safely
   void _startTimer() {
-    Timer(const Duration(seconds: 3), () async {
+    Timer(const Duration(seconds: 5), () async {
       if (!mounted) return;
 
       final user = FirebaseAuth.instance.currentUser;
@@ -87,56 +84,19 @@ class _SplashPageState extends State<SplashPage>
 
           /// CENTER CONTENT
           Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-
-                /// LOGO
-                SlideTransition(
-                  position: _logoAnimation,
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      width: 180,
-                    ),
-                  ),
+            child: SlideTransition(
+              position: _logoAnimation,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  width: 240, // 🔥 Bigger logo
                 ),
-
-                const SizedBox(height: 20),
-
-                /// TEXT
-                SlideTransition(
-                  position: _textAnimation,
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: Column(
-                      children: const [
-                        Text(
-                          'AgroX',
-                          style: TextStyle(
-                            fontSize: 38,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2E7D32),
-                          ),
-                        ),
-                        SizedBox(height: 6),
-                        Text(
-                          'Smart Crop Disease AI',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
 
-          /// LOADING
+          /// LOADING (UNCHANGED)
           const Positioned(
             bottom: 40,
             left: 0,

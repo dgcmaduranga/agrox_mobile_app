@@ -31,7 +31,7 @@ dependencies:
 
   # 🔥 Dots indicator
   smooth_page_indicator: ^1.1.0
-  flutter_dotenv: ^6.0.0
+  # flutter_dotenv removed: backend-managed secrets; no env in app
 
 dev_dependencies:
   flutter_test:
@@ -57,5 +57,4 @@ flutter:
 
     # 🔹 JSON data
     - assets/data/diseases.json
-    # Environment file (needed for flutter_dotenv on web)
-    - .env
+    # Environment file removed; flutter_dotenv is no longer used
