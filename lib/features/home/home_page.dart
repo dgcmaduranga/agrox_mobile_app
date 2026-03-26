@@ -272,14 +272,29 @@ class _HomePageState extends State<HomePage> {
   // Load diseases JSON from assets
   Future<void> loadDiseases() async {
     try {
-      final String response = await rootBundle.loadString('assets/data/diseases.json');
-      final data = json.decode(response);
+      // Backend endpoint serving the diseases JSON
+      final uri = Uri.parse('http://127.0.0.1:8000/risk');
 
-      setState(() {
-        allDiseases = data;
-      });
+      final resp = await http.get(uri);
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        // Expecting the backend to return the same structure as the original
+        setState(() {
+          allDiseases = data;
+        });
+      } else {
+        // Non-200 response: keep an empty list and log for debugging
+        print('Failed to load diseases from backend: ${resp.statusCode}');
+        setState(() {
+          allDiseases = [];
+        });
+      }
     } catch (e) {
-      print('Failed to load diseases.json: $e');
+      // Networking or parsing error: fallback to empty list and log
+      print('Failed to load diseases from backend: $e');
+      setState(() {
+        allDiseases = [];
+      });
     }
   }
 
@@ -390,7 +405,9 @@ class _HomePageState extends State<HomePage> {
               ? (Matrix4.identity()..scale(0.9))
               : Matrix4.identity(),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark
+            ? const Color(0xFF1E1E1E)
+            :Colors.white,
             shape: BoxShape.circle,
             border: Border.all(
               color: _isFabPressed

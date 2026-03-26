@@ -54,7 +54,3 @@ flutter:
     - assets/images/diseases/tea/
     - assets/images/diseases/rice/
     - assets/images/diseases/coconut/
-
-    # 🔹 JSON data
-    - assets/data/diseases.json
-    # Environment file removed; flutter_dotenv is no longer used
