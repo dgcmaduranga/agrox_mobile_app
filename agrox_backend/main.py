@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import requests
 import json
+
+# ✅ IMPORT weather service
+from services.weather_service import get_weather
 
 app = FastAPI()
 
@@ -19,25 +21,22 @@ app.add_middleware(
 def home():
     return {"message": "Backend running"}
 
-# ✅ WEATHER ROUTE (MICROSERVICE CALL)
+# ✅ WEATHER ROUTE (DIRECT SERVICE CALL ✅)
 @app.get("/weather")
 def weather(lat: float, lon: float):
-    res = requests.get(f"http://127.0.0.1:8001/weather?lat={lat}&lon={lon}")
-    return res.json()
+    return get_weather(lat, lon)
 
-# ✅ DISEASES ROUTE (NEW 🔥)
+# ✅ DISEASES ROUTE
 @app.get("/diseases")
 def get_diseases():
     with open("data/diseases.json") as f:
         return json.load(f)
 
-
+# ✅ RISK ROUTE
 @app.get("/risk")
 def get_risk():
-    """Return the full diseases JSON as the risk payload.
-
-    This simple endpoint mirrors the local `data/diseases.json` file
-    so the Flutter client can fetch disease/risk data from the backend.
+    """
+    Return diseases JSON as risk payload
     """
     with open("data/diseases.json") as f:
         return json.load(f)
