@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'disease_detail_page.dart';
 
 class KnowledgePage extends StatefulWidget {
@@ -24,14 +24,20 @@ class _KnowledgePageState extends State<KnowledgePage> {
   }
 
   Future<void> loadData() async {
-    final jsonString =
-        await rootBundle.loadString('assets/data/diseases.json');
-    final data = json.decode(jsonString);
+    try {
+      final res = await http.get(
+        Uri.parse("http://127.0.0.1:8000/diseases"),
+      );
 
-    setState(() {
-      allDiseases = data;
-      applyFilter();
-    });
+      final data = json.decode(res.body);
+
+      setState(() {
+        allDiseases = data;
+        applyFilter();
+      });
+    } catch (e) {
+      print("Error loading diseases: $e");
+    }
   }
 
   void applyFilter() {
@@ -51,6 +57,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
       filteredDiseases = temp;
     });
   }
+
   Widget buildTab(
       String crop, String label, IconData icon, bool isDark) {
     bool isSelected = selectedCrop == crop;
@@ -105,6 +112,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -212,7 +220,6 @@ class _KnowledgePageState extends State<KnowledgePage> {
                         ),
                         child: Row(
                           children: [
-
                             ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: Image.asset(
@@ -222,7 +229,6 @@ class _KnowledgePageState extends State<KnowledgePage> {
                                 fit: BoxFit.cover,
                               ),
                             ),
-
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -254,7 +260,6 @@ class _KnowledgePageState extends State<KnowledgePage> {
                                 ],
                               ),
                             ),
-
                             Icon(Icons.arrow_forward_ios,
                                 size: 16,
                                 color: isDark
