@@ -1,9 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
 import json
 
-# ✅ IMPORT weather service
+# ✅ IMPORT services
 from services.weather_service import get_weather
+from services.ai_service import predict   # 🔥 NEW
 
 app = FastAPI()
 
@@ -21,7 +23,7 @@ app.add_middleware(
 def home():
     return {"message": "Backend running"}
 
-# ✅ WEATHER ROUTE (DIRECT SERVICE CALL ✅)
+# ✅ WEATHER ROUTE
 @app.get("/weather")
 def weather(lat: float, lon: float):
     return get_weather(lat, lon)
@@ -35,8 +37,33 @@ def get_diseases():
 # ✅ RISK ROUTE
 @app.get("/risk")
 def get_risk():
-    """
-    Return diseases JSON as risk payload
-    """
     with open("data/diseases.json") as f:
         return json.load(f)
+
+# 🔥 ==============================
+# 🔥 AI DETECTION ROUTE (NEW)
+# 🔥 ==============================
+
+@app.post("/detect")
+async def detect(
+    file: UploadFile = File(...),
+    crop: str = Form(...)
+):
+    try:
+        # ✅ Open image
+        image = Image.open(file.file)
+
+        # ✅ Run AI model
+        disease, confidence = predict(image, crop)
+
+        return {
+            "status": "success",
+            "disease": disease,
+            "confidence": confidence
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
