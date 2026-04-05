@@ -46,3 +46,7 @@ app.*.symbols
 
 # Environment file (contains sensitive API keys)
 .env
+.venv/
+venv/
+__pycache__/
+*.pyc
