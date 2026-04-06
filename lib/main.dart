@@ -19,6 +19,7 @@ import 'features/knowledge/knowledge_page.dart';
 
 // ✅ AI Pages
 import 'features/home/detect_page.dart';
+import 'features/home/chat_page.dart'; // 🔥 ADD THIS
 
 // Theme
 import 'services/theme_provider.dart';
@@ -131,7 +132,10 @@ class AgroXApp extends StatelessWidget {
         '/knowledge': (context) => const KnowledgePage(),
 
         // 🤖 AI Scan Page
-        '/scan': (context) => DetectPage(), // ❌ no const
+        '/scan': (context) => DetectPage(),
+
+        // 🤖 CHATBOT (NEW 🔥🔥🔥)
+        '/chatbot': (context) => const ChatPage(), // ✅ THIS FIXES YOUR ERROR
       },
     );
   }
@@ -166,12 +170,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 Splash
     if (_showSplash) {
       return const SplashPage();
     }
 
-    // 🔥 Auth check
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
