@@ -55,3 +55,4 @@ __pycache__/
 *.tflite
 models/
 agrox_backend/models/
+firebase_key.json
