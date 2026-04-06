@@ -50,3 +50,8 @@ app.*.symbols
 venv/
 __pycache__/
 *.pyc
+# AI Models
+*.h5
+*.tflite
+models/
+agrox_backend/models/
