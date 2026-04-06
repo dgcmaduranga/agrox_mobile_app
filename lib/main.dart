@@ -17,15 +17,15 @@ import 'features/profile/profile_page.dart';
 // Knowledge Hub
 import 'features/knowledge/knowledge_page.dart';
 
+// ✅ AI Pages
+import 'features/home/detect_page.dart';
+
 // Theme
 import 'services/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // No environment variables loaded in the app — backend handles secrets.
-
-  /// 🔥 FIREBASE INIT
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -49,7 +49,7 @@ class AgroXApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'AgroX',
 
-      /// 🔥 GLOBAL UI (CENTERED MOBILE SIZE)
+      // 🔥 UI WRAPPER (CENTERED)
       builder: (context, child) {
         final data = MediaQuery.of(context);
 
@@ -67,22 +67,17 @@ class AgroXApp extends StatelessWidget {
         );
       },
 
-      /// 🔥 THEME MODE
       themeMode: themeProvider.themeMode,
 
-      ///////////////////////////////////////////////////////////////
-      /// 🌞 LIGHT THEME
-      ///////////////////////////////////////////////////////////////
+      // 🌞 LIGHT THEME
       theme: ThemeData(
         brightness: Brightness.light,
         primaryColor: Colors.green,
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
-
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.green,
           brightness: Brightness.light,
         ),
-
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -93,24 +88,19 @@ class AgroXApp extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-
         cardColor: Colors.white,
         useMaterial3: true,
       ),
 
-      ///////////////////////////////////////////////////////////////
-      /// 🌙 DARK THEME
-      ///////////////////////////////////////////////////////////////
+      // 🌙 DARK THEME
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         primaryColor: Colors.green,
         scaffoldBackgroundColor: const Color(0xFF121212),
-
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.green,
           brightness: Brightness.dark,
         ),
-
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF1E1E1E),
           elevation: 0,
@@ -121,19 +111,14 @@ class AgroXApp extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-
         cardColor: const Color(0xFF1E1E1E),
         useMaterial3: true,
       ),
 
-      ///////////////////////////////////////////////////////////////
-      /// 🔥 ENTRY
-      ///////////////////////////////////////////////////////////////
+      // 🔥 ENTRY
       home: const AuthWrapper(),
 
-      ///////////////////////////////////////////////////////////////
-      /// 🔥 ROUTES
-      ///////////////////////////////////////////////////////////////
+      // 🔥 ROUTES
       routes: {
         '/welcome': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
@@ -142,11 +127,11 @@ class AgroXApp extends StatelessWidget {
         '/profile': (context) => const ProfilePage(),
         '/reset-password': (context) => const ResetPasswordPage(),
 
-        /// 🔥 KNOWLEDGE HUB
+        // 📚 Knowledge Hub
         '/knowledge': (context) => const KnowledgePage(),
 
-        /// 🔥 FUTURE (AI CHATBOT READY)
-        // '/chatbot': (context) => const ChatbotPage(),
+        // 🤖 AI Scan Page
+        '/scan': (context) => DetectPage(), // ❌ no const
       },
     );
   }
@@ -170,7 +155,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void initState() {
     super.initState();
 
-    /// 🔥 SPLASH DELAY
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() {
@@ -182,28 +166,24 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-
-    /// 🔥 SHOW SPLASH FIRST
+    // 🔥 Splash
     if (_showSplash) {
       return const SplashPage();
     }
 
-    /// 🔥 AUTH STATE LISTENER
+    // 🔥 Auth check
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
 
-        /// 🔄 LOADING
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SplashPage();
         }
 
-        /// ✅ LOGGED IN
         if (snapshot.hasData) {
           return const HomePage();
         }
 
-        /// ❌ NOT LOGGED IN
         return const WelcomePage();
       },
     );

@@ -1,19 +1,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 🔥 INTERNET (API calls) -->
+    <!-- 🌐 INTERNET (API calls) -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
-    <!-- 🔥 LOCATION PERMISSIONS -->
+    <!-- 📍 LOCATION PERMISSIONS -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
-    <!-- 🔥 OPTIONAL (Background location if needed later) -->
-    <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/> -->
+    <!-- 📷 CAMERA (for Scan Leaf) -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <!-- 📁 STORAGE (for image upload - optional but safe) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
 
     <application
-        android:label="agrox_mobile_app"
+        android:label="AgroX"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
@@ -25,11 +29,10 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- 🔥 Splash Theme -->
+            <!-- 🌟 Splash Theme -->
             <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -45,7 +48,7 @@
 
     </application>
 
-    <!-- 🔥 Text processing (keep this) -->
+    <!-- 🔤 Text processing -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../services/api_service.dart';
 import 'disease_detail_page.dart';
 
 class KnowledgePage extends StatefulWidget {
@@ -11,8 +12,8 @@ class KnowledgePage extends StatefulWidget {
 }
 
 class _KnowledgePageState extends State<KnowledgePage> {
-  List allDiseases = [];
-  List filteredDiseases = [];
+  List<dynamic> allDiseases = [];
+  List<dynamic> filteredDiseases = [];
 
   String selectedCrop = 'rice';
   String searchText = '';
@@ -25,16 +26,20 @@ class _KnowledgePageState extends State<KnowledgePage> {
 
   Future<void> loadData() async {
     try {
-      final res = await http.get(
-        Uri.parse("http://127.0.0.1:8000/diseases"),
-      );
-
-      final data = json.decode(res.body);
-
-      setState(() {
-        allDiseases = data;
-        applyFilter();
-      });
+      final uri = Uri.parse('${ApiService.baseUrl}/diseases');
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setState(() {
+          allDiseases = (data is List) ? data : [];
+          applyFilter();
+        });
+      } else {
+        setState(() {
+          allDiseases = [];
+          filteredDiseases = [];
+        });
+      }
     } catch (e) {
       print("Error loading diseases: $e");
     }

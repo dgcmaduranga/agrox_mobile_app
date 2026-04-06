@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:html' as html; // For browser geolocation
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import '../../services/api_service.dart';
 import '../../services/weather_service.dart';
+import 'package:geocoding/geocoding.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -56,10 +56,8 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
 
-    loadDiseases().then((_) {
-      // After diseases loaded, fetch location & weather
-      loadData();
-    });
+    // Load location, weather and risk data
+    loadData();
 
     _carouselTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (!mounted) return;
@@ -124,55 +122,82 @@ class _HomePageState extends State<HomePage> {
       lon = coords['lon']!.toDouble();
     }
 
-    // 2) Fetch weather from backend via fetchWeather wrapper
+    // 2) Fetch weather via WeatherService and risk via backend
     try {
-      final data = await fetchWeather(lat, lon);
-      if (data != null) {
-        setState(() {
-          weather = {
-            'temp': (data['temp'] is num) ? (data['temp'] as num).round() : data['temp'],
-            'humidity': (data['humidity'] is num) ? (data['humidity'] as num).toInt() : data['humidity'],
-            'rain': 0,
-            'city': 'Current Location', // will be replaced by reverse geocode below if available
-            'condition': data['condition'] ?? '',
-          };
-        });
+      final weatherService = WeatherService();
+      final w = await weatherService.getWeather(lat, lon);
+      final r = await fetchRisk(lat, lon);
 
-        // 3) Reverse geocode to human-readable location name
-        final locName = await fetchLocationName(lat, lon);
+      if (w == null) {
+        // API failed
         setState(() {
-          weather = {
-            ...?weather,
-            'city': locName ?? 'Current Location',
-          };
           isLoading = false;
+          weather = null;
+          allDiseases = r ?? [];
+          riskText = "Unable to fetch data";
         });
-
-        calculateRisk();
-      } else {
-        // fetchWeather returned null
-        setState(() {
-          weather = {
-            'temp': 0,
-            'humidity': 0,
-            'rain': 0,
-            'city': 'Current Location',
-            'condition': '',
-          };
-          isLoading = false;
-        });
+        return;
       }
-    } catch (e) {
-      print('Weather load failed: $e');
+
+      // Debug: print full parsed response from WeatherService
+      // ignore: avoid_print
+      print('WeatherService returned: $w');
+
+      // Extract values (support both data['main']['temp'] and data['temp'])
+      final dynamic rawTemp = w['temp'];
+      final double? tempVar = rawTemp is num ? (rawTemp as num).toDouble() : (rawTemp is String ? double.tryParse(rawTemp) : null);
+      final int? humidityVar = w['humidity'] is int ? (w['humidity'] as int) : (w['humidity'] is num ? (w['humidity'] as num).toInt() : null);
+      final String? condVar = (w['condition'] != null) ? w['condition'].toString() : null;
+
+      // Print temp before UI update for debugging
+      // ignore: avoid_print
+      print('Parsed temp before UI update: $tempVar');
+
+      // Use backend-provided city if present, otherwise show 'Detecting...' until reverse geocode
+      final String locationName = (w['city'] != null && w['city'].toString().isNotEmpty) ? w['city'].toString() : 'Detecting...';
+
       setState(() {
         weather = {
-          'temp': 0,
-          'humidity': 0,
-          'rain': 0,
-          'city': 'Current Location',
-          'condition': '',
+          ...?w,
+          'temp': tempVar,
+          'humidity': humidityVar,
+          'condition': condVar ?? '',
+          'city': locationName,
         };
+        allDiseases = r ?? [];
         isLoading = false;
+      });
+
+      // reverse geocode to get place name (best-effort)
+      try {
+        final places = await placemarkFromCoordinates(lat, lon);
+        if (places.isNotEmpty) {
+          final p = places.first;
+          final city = p.locality ?? p.subAdministrativeArea;
+          final chosen = city ?? p.administrativeArea ?? p.country ?? 'Detecting...';
+          setState(() {
+            weather = {
+              ...?weather,
+              'city': chosen,
+            };
+          });
+        }
+      } catch (e) {
+        // ignore geocoding errors; keep existing city if any
+        // ignore: avoid_print
+        print('Reverse geocoding failed: $e');
+      }
+
+      calculateRisk();
+    } catch (e) {
+      // General failure
+      // ignore: avoid_print
+      print('Weather load failed: $e');
+      setState(() {
+        isLoading = false;
+        weather = null;
+        allDiseases = [];
+        riskText = "Unable to fetch data";
       });
     }
   }
@@ -185,105 +210,38 @@ class _HomePageState extends State<HomePage> {
 
   Future<Map<String, double>?> getLocationCoordinates() async {
     try {
-      if (kIsWeb) {
-        final completer = Completer<Map<String, double>?>();
-        try {
-          final geo = html.window.navigator.geolocation;
-          if (geo == null) {
-            completer.complete(null);
-          } else {
-            geo.getCurrentPosition().then((pos) {
-              final latNum = pos.coords?.latitude ?? 0.0;
-              final lonNum = pos.coords?.longitude ?? 0.0;
-              completer.complete({'lat': (latNum is num) ? latNum.toDouble() : double.parse(latNum.toString()), 'lon': (lonNum is num) ? lonNum.toDouble() : double.parse(lonNum.toString())});
-            }).catchError((err) {
-              print('Browser geolocation error: $err');
-              completer.complete(null);
-            });
-          }
-        } catch (e) {
-          print('Browser geolocation exception: $e');
-          completer.complete(null);
-        }
-        return completer.future;
-      } else {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled) return null;
+      // Mobile-first approach using Geolocator (handles permissions)
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
 
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-        }
-        if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
-          return null;
-        }
-
-        final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-        final double plat = (pos.latitude is num) ? pos.latitude.toDouble() : double.parse(pos.latitude.toString());
-        final double plon = (pos.longitude is num) ? pos.longitude.toDouble() : double.parse(pos.longitude.toString());
-        return {'lat': plat, 'lon': plon};
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return null;
       }
+      if (permission == LocationPermission.deniedForever) return null;
+
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.low);
+      return {'lat': pos.latitude, 'lon': pos.longitude};
     } catch (e) {
       print('getLocationCoordinates failed: $e');
       return null;
     }
   }
 
-  // Fetch weather using backend endpoint; returns normalized map or null on failure.
-  Future<Map<String, dynamic>?> fetchWeather(double lat, double lon) async {
-    try {
-      final backend = WeatherService();
-      final data = await backend.getWeather(lat, lon);
-
-      // Normalize keys to our local shape
-      return {
-        'temp': (data['temp'] is num) ? (data['temp'] as num).toDouble() : (double.tryParse(data['temp']?.toString() ?? '') ?? 0.0),
-        'humidity': (data['humidity'] is num) ? (data['humidity'] as num).toInt() : int.tryParse(data['humidity']?.toString() ?? '') ?? 0,
-        'condition': data['condition'] ?? '',
-      };
-    } catch (e) {
-      print('fetchWeather error: $e');
-      return null;
-    }
-  }
-
-  // Reverse geocode using OpenStreetMap Nominatim (free). Best-effort.
-  Future<String?> fetchLocationName(double lat, double lon) async {
-    try {
-      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon');
-      final resp = await http.get(url, headers: {'User-Agent': 'AgroX-App/1.0'});
-      if (resp.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(resp.body);
-        final addr = data['address'] as Map<String, dynamic>?;
-        String? name;
-        if (addr != null) {
-          name = addr['city'] as String? ?? addr['town'] as String? ?? addr['village'] as String? ?? addr['county'] as String?;
-        }
-        name = name ?? (data['display_name'] as String?)?.split(',').first;
-        return name;
-      }
-      return null;
-    } catch (e) {
-      print('fetchLocationName error: $e');
-      return null;
-    }
-  }
+  // Weather API calls are handled in services/weather_service.dart
 
   // Load diseases JSON from assets
   Future<void> loadDiseases() async {
     try {
-      // Backend endpoint serving the diseases JSON
-      final uri = Uri.parse('http://127.0.0.1:8000/risk');
-
-      final resp = await http.get(uri);
+      final uri = Uri.parse('${ApiService.baseUrl}/risk');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
-        // Expecting the backend to return the same structure as the original
         setState(() {
-          allDiseases = data;
+          allDiseases = (data is List) ? data : [];
         });
       } else {
-        // Non-200 response: keep an empty list and log for debugging
         print('Failed to load diseases from backend: ${resp.statusCode}');
         setState(() {
           allDiseases = [];
@@ -295,6 +253,21 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         allDiseases = [];
       });
+    }
+  }
+
+  Future<List<dynamic>?> fetchRisk(double lat, double lon) async {
+    try {
+      final uri = Uri.parse('${ApiService.baseUrl}/risk?lat=$lat&lon=$lon');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        return (data is List) ? data : [];
+      }
+      return [];
+    } catch (e) {
+      print('fetchRisk error: $e');
+      return [];
     }
   }
 
@@ -488,23 +461,25 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
+                  : (weather == null)
+                    ? const Center(child: Text('Unable to fetch data'))
                     : Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _WeatherItem(
-                              icon: Icons.location_on,
-                              text: "${weather?['city'] ?? ''}"),
-                          _WeatherItem(
-                              icon: Icons.thermostat,
-                              text: "${weather?['temp'] ?? ''}°C"),
-                          _WeatherItem(
-                              icon: Icons.water_drop,
-                              text: "${weather?['humidity'] ?? ''}%"),
-                          _WeatherItem(
-                              icon: Icons.cloud,
-                              text: "${weather?['condition'] ?? ''}"),
-                        ],
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _WeatherItem(
+                          icon: Icons.location_on,
+                          text: "${weather?['city'] ?? 'Detecting...'}"),
+                        _WeatherItem(
+                          icon: Icons.thermostat,
+                          text: weather?['temp'] != null ? '${(weather!['temp'] as num).toStringAsFixed(1)}°C' : '--'),
+                        _WeatherItem(
+                          icon: Icons.water_drop,
+                          text: weather?['humidity'] != null ? '${weather!['humidity']}%': '--'),
+                        _WeatherItem(
+                          icon: Icons.cloud,
+                          text: '${weather?['condition'] ?? ''}'),
+                      ],
                       ),
               ),
 
