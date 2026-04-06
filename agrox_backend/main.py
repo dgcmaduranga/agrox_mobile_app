@@ -6,6 +6,10 @@ import json
 from services.weather_service import get_weather
 from services.ai_service import predict
 
+# 🆕 CHATBOT IMPORT
+from services.chatbot_service import ask_chatbot
+from pydantic import BaseModel
+
 app = FastAPI()
 
 # =========================
@@ -71,56 +75,35 @@ async def detect(
     crop: str = Form(...)
 ):
     try:
-        # =========================
-        # IMAGE LOAD
-        # =========================
         image = Image.open(file.file).convert("RGB")
 
-        # =========================
-        # AI PREDICTION
-        # =========================
         disease, confidence = predict(image, crop)
 
         print("PREDICTED:", disease, "| CONF:", confidence)
 
-        # =========================
-        # ❌ BLOCK UNKNOWN / LOW CONFIDENCE
-        # =========================
         if disease == "unknown" or confidence < 0.75:
             return {
                 "status": "error",
                 "message": "Invalid image for selected crop"
             }
 
-        # =========================
-        # LOAD DATA
-        # =========================
         detection_data = load_detection()
 
         disease_key = normalize(disease)
         crop_key = normalize(crop)
 
-        # =========================
-        # FIND MATCH
-        # =========================
         data = None
         for d in detection_data:
             if normalize(d["id"]) == disease_key and normalize(d["crop"]) == crop_key:
                 data = d
                 break
 
-        # =========================
-        # ❌ NO MATCH
-        # =========================
         if not data:
             return {
                 "status": "error",
                 "message": "Invalid image for selected crop"
             }
 
-        # =========================
-        # RISK LOGIC
-        # =========================
         if confidence >= 0.7:
             risk = "High"
             treatment = data.get("highRiskTreatments", [])
@@ -128,9 +111,6 @@ async def detect(
             risk = "Low"
             treatment = data.get("lowRiskTreatments", [])
 
-        # =========================
-        # SUCCESS RESPONSE
-        # =========================
         return {
             "status": "success",
             "disease": data["name"],
@@ -146,3 +126,14 @@ async def detect(
             "status": "error",
             "message": str(e)
         }
+
+# =========================
+# 🆕 CHATBOT (NEW 🔥)
+# =========================
+class ChatRequest(BaseModel):
+    question: str
+
+@app.post("/chat")
+def chat(req: ChatRequest):
+    answer = ask_chatbot(req.question)
+    return {"response": answer}
