@@ -10,6 +10,9 @@ from services.ai_service import predict
 from services.chatbot_service import ask_chatbot
 from pydantic import BaseModel
 
+# 🆕 TRANSLATE IMPORT
+from services.translate_service import translate_text
+
 app = FastAPI()
 
 # =========================
@@ -67,12 +70,25 @@ def normalize(text):
     return text.lower().replace(" ", "_")
 
 # =========================
-# DETECT (FINAL 🔥🔥🔥)
+# 🔥 GLOBAL TRANSLATE API (NEW)
+# =========================
+@app.post("/translate")
+def translate_api(
+    text: str = Form(...),
+    lang: str = Form("en")
+):
+    return {
+        "translated": translate_text(text, lang)
+    }
+
+# =========================
+# DETECT (UPDATED 🔥)
 # =========================
 @app.post("/detect")
 async def detect(
     file: UploadFile = File(...),
-    crop: str = Form(...)
+    crop: str = Form(...),
+    lang: str = Form("en")
 ):
     try:
         image = Image.open(file.file).convert("RGB")
@@ -81,11 +97,10 @@ async def detect(
 
         print("PREDICTED:", disease, "| CONF:", confidence)
 
-        # ❌ REMOVE HARD 0.75 CHECK
         if disease == "unknown":
             return {
                 "status": "error",
-                "message": "Invalid image for selected crop"
+                "message": translate_text("Invalid image for selected crop", lang)
             }
 
         detection_data = load_detection()
@@ -105,7 +120,7 @@ async def detect(
         if not data:
             return {
                 "status": "error",
-                "message": "Invalid image for selected crop"
+                "message": translate_text("Invalid image for selected crop", lang)
             }
 
         if confidence >= 0.7:
@@ -117,27 +132,30 @@ async def detect(
 
         return {
             "status": "success",
-            "disease": data["name"],
+            "disease": translate_text(data["name"], lang),
             "accuracy": round(confidence * 100, 2),
-            "risk": risk,
-            "description": data.get("description", ""),
-            "treatment": treatment
+            "risk": translate_text(risk, lang),
+            "description": translate_text(data.get("description", ""), lang),
+            "treatment": [translate_text(t, lang) for t in treatment]
         }
 
     except Exception as e:
         print("ERROR:", str(e))
         return {
             "status": "error",
-            "message": str(e)
+            "message": translate_text(str(e), lang)
         }
 
 # =========================
-# 🆕 CHATBOT (UNCHANGED)
+# 🆕 CHATBOT (UPDATED 🔥)
 # =========================
 class ChatRequest(BaseModel):
     question: str
+    lang: str = "en"
 
 @app.post("/chat")
 def chat(req: ChatRequest):
     answer = ask_chatbot(req.question)
-    return {"response": answer}
+    return {
+        "response": translate_text(answer, req.lang)
+    }
