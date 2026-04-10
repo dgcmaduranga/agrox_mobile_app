@@ -81,7 +81,8 @@ async def detect(
 
         print("PREDICTED:", disease, "| CONF:", confidence)
 
-        if disease == "unknown" or confidence < 0.75:
+        # ❌ REMOVE HARD 0.75 CHECK
+        if disease == "unknown":
             return {
                 "status": "error",
                 "message": "Invalid image for selected crop"
@@ -94,7 +95,10 @@ async def detect(
 
         data = None
         for d in detection_data:
-            if normalize(d["id"]) == disease_key and normalize(d["crop"]) == crop_key:
+            if (
+                normalize(d.get("id", "")) == disease_key
+                or normalize(d.get("name", "")) == disease_key
+            ) and normalize(d.get("crop", "")) == crop_key:
                 data = d
                 break
 
@@ -128,7 +132,7 @@ async def detect(
         }
 
 # =========================
-# 🆕 CHATBOT (NEW 🔥)
+# 🆕 CHATBOT (UNCHANGED)
 # =========================
 class ChatRequest(BaseModel):
     question: str
