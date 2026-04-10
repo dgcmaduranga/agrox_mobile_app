@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgests/translated_text.dart';
 
 class DiseaseDetailPage extends StatelessWidget {
   final Map disease;
@@ -16,7 +17,7 @@ class DiseaseDetailPage extends StatelessWidget {
       appBar: AppBar(
         elevation: 0,
         centerTitle: true,
-        title: Text(
+        title: TranslatedText(
           "${disease['name']} (${disease['crop']})",
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
@@ -65,20 +66,20 @@ class DiseaseDetailPage extends StatelessWidget {
                     children: [
 
                       ///  OVERVIEW
-                      const Text(
+                      TranslatedText(
                         "Overview",
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold),
                       ),
 
                       const SizedBox(height: 8),
 
-                      _row("Crop:", disease['crop']),
-                      _row("Disease:", disease['name']),
+                      _row(context, "Crop:", disease['crop']),
+                      _row(context, "Disease:", disease['name']),
 
                       const SizedBox(height: 16),
 
-                      Text(
+                      TranslatedText(
                         disease['description'],
                         style: TextStyle(
                           fontSize: 14,
@@ -91,25 +92,25 @@ class DiseaseDetailPage extends StatelessWidget {
 
                       const SizedBox(height: 20),
 
-                      _sectionTitle("Symptoms"),
+                      _sectionTitle(context, "Symptoms"),
                       ..._buildList(disease['symptoms']),
 
                       const SizedBox(height: 16),
 
-                      _sectionTitle("Causes"),
+                      _sectionTitle(context, "Causes"),
                       ..._buildList(disease['causes']),
 
                       const SizedBox(height: 16),
 
-                      _sectionTitle("⚠ High Risk Treatments"),
+                      _sectionTitle(context, "⚠ High Risk Treatments"),
                       ..._buildList(disease['highRiskTreatments']),
 
                       const SizedBox(height: 16),
-                      _sectionTitle("✅ Low Risk Treatments"),
+                      _sectionTitle(context, "✅ Low Risk Treatments"),
                       ..._buildList(disease['lowRiskTreatments']),
 
                       const SizedBox(height: 16),
-                      _sectionTitle("Prevention"),
+                      _sectionTitle(context, "Prevention"),
                       ..._buildList(disease['prevention']),
 
                       const SizedBox(height: 24),
@@ -125,7 +126,7 @@ class DiseaseDetailPage extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 height: 52,
-                child: ElevatedButton(
+                  child: ElevatedButton(
                   onPressed: () {
                     Navigator.pushNamedAndRemoveUntil(
                       context,
@@ -140,9 +141,9 @@ class DiseaseDetailPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
+                  child: TranslatedText(
                     "Back to Home",
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -154,25 +155,25 @@ class DiseaseDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _row(String title, String value) {
+  Widget _row(BuildContext context, String title, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Text(
+          TranslatedText(
             title,
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(width: 6),
-          Expanded(child: Text(value)),
+          Expanded(child: TranslatedText(value)),
         ],
       ),
     );
   }
-  Widget _sectionTitle(String title) {
+  Widget _sectionTitle(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
+      child: TranslatedText(
         title,
         style: const TextStyle(
             fontSize: 16, fontWeight: FontWeight.bold),
@@ -183,7 +184,7 @@ class DiseaseDetailPage extends StatelessWidget {
     return list.map<Widget>((e) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
+        child: TranslatedText(
           "• $e",
           style: const TextStyle(height: 1.4),
         ),

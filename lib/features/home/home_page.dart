@@ -7,7 +7,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../../services/api_service.dart';
 import '../../services/weather_service.dart';
+import '../../widgests/translated_text.dart';
 import 'package:geocoding/geocoding.dart';
+import '../../services/geocoding_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,7 +18,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final PageController _pageController = PageController();
   Timer? _carouselTimer;
 
@@ -56,7 +58,10 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
 
-    // Load location, weather and risk data
+    // Observe app lifecycle to refresh location when app resumes
+    WidgetsBinding.instance.addObserver(this);
+
+    // Load location, weather and risk data (force fresh GPS)
     loadData();
 
     _carouselTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
@@ -97,7 +102,17 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _carouselTimer?.cancel();
     _pageController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // App returned to foreground — refresh location and weather
+      loadData();
+    }
   }
 
   ///////////////////////////////////////////////////////////////
@@ -111,16 +126,21 @@ class _HomePageState extends State<HomePage> {
       riskText = "Checking risk...";
     });
 
-    // Default fallback coords (Colombo)
-    double lat = 6.927079;
-    double lon = 79.861244;
-
-    // 1) Try to get coordinates
+    // 1) Get fresh coordinates from device GPS (do NOT use hardcoded or cached values)
     final coords = await getLocation();
-    if (coords != null) {
-      lat = coords['lat']!.toDouble();
-      lon = coords['lon']!.toDouble();
+    if (coords == null) {
+      // Could not obtain fresh location — show error instead of using fallback coordinates
+      setState(() {
+        isLoading = false;
+        weather = null;
+        allDiseases = [];
+        riskText = "Unable to fetch data";
+      });
+      return;
     }
+
+    final double lat = coords['lat']!.toDouble();
+    final double lon = coords['lon']!.toDouble();
 
     // 2) Fetch weather via WeatherService and risk via backend
     try {
@@ -153,40 +173,24 @@ class _HomePageState extends State<HomePage> {
       // ignore: avoid_print
       print('Parsed temp before UI update: $tempVar');
 
-      // Use backend-provided city if present, otherwise show 'Detecting...' until reverse geocode
-      final String locationName = (w['city'] != null && w['city'].toString().isNotEmpty) ? w['city'].toString() : 'Detecting...';
+      // Use backend-provided city if present; show 'Detecting...' while reverse geocoding
+      final String apiCity = (w['city'] != null && w['city'].toString().isNotEmpty) ? w['city'].toString() : 'Detecting...';
 
+      // Update UI immediately with weather data returned from backend
       setState(() {
         weather = {
           ...?w,
           'temp': tempVar,
           'humidity': humidityVar,
           'condition': condVar ?? '',
-          'city': locationName,
+          'city': apiCity,
         };
         allDiseases = r ?? [];
         isLoading = false;
       });
 
-      // reverse geocode to get place name (best-effort)
-      try {
-        final places = await placemarkFromCoordinates(lat, lon);
-        if (places.isNotEmpty) {
-          final p = places.first;
-          final city = p.locality ?? p.subAdministrativeArea;
-          final chosen = city ?? p.administrativeArea ?? p.country ?? 'Detecting...';
-          setState(() {
-            weather = {
-              ...?weather,
-              'city': chosen,
-            };
-          });
-        }
-      } catch (e) {
-        // ignore geocoding errors; keep existing city if any
-        // ignore: avoid_print
-        print('Reverse geocoding failed: $e');
-      }
+      // Run reverse geocoding asynchronously (do not block UI). Prefer Google Geocoding API.
+      _reverseGeocodeAndUpdate(lat, lon, apiCity: apiCity);
 
       calculateRisk();
     } catch (e) {
@@ -208,23 +212,66 @@ class _HomePageState extends State<HomePage> {
     return await getLocationCoordinates();
   }
 
+  /// Reverse geocode coordinates to a readable city/locality and update UI.
+  /// Keeps a safe fallback and never throws to the UI.
+  Future<void> _reverseGeocodeAndUpdate(double lat, double lon, {String? apiCity}) async {
+    try {
+      final name = await GeocodingService.getBestLocationName(lat, lon);
+      final chosen = (name != null && name.trim().isNotEmpty) ? name.trim() : 'Unknown Location';
+
+      if (!mounted) return;
+      setState(() {
+        weather = {
+          ...?weather,
+          'city': chosen,
+        };
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          weather = {
+            ...?weather,
+            'city': 'Unknown Location',
+          };
+        });
+      }
+      // ignore: avoid_print
+      print('Reverse geocoding (Nominatim) failed: $e');
+    }
+  }
+
   Future<Map<String, double>?> getLocationCoordinates() async {
     try {
-      // Mobile-first approach using Geolocator (handles permissions)
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return null;
+      if (!serviceEnabled) {
+        // Location services are disabled on the device.
+        print('Location services disabled.');
+        return null;
+      }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return null;
       }
-      if (permission == LocationPermission.deniedForever) return null;
+      if (permission == LocationPermission.denied) {
+        print('Location permission denied by user.');
+        return null;
+      }
+      if (permission == LocationPermission.deniedForever) {
+        print('Location permission permanently denied.');
+        return null;
+      }
 
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.low);
+      // IMPORTANT: force fresh GPS location with highest practical accuracy
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+        timeLimit: const Duration(seconds: 15),
+      );
+
       return {'lat': pos.latitude, 'lon': pos.longitude};
     } catch (e) {
       print('getLocationCoordinates failed: $e');
+      // Do NOT use last known position or cached coordinates per requirements.
       return null;
     }
   }
@@ -419,13 +466,25 @@ class _HomePageState extends State<HomePage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    "${getGreeting()}, ${user?.displayName ?? "User"} 👋",
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
+                  Row(
+                    children: [
+                      TranslatedText(
+                        getGreeting(),
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : Colors.black),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        ", ${user?.displayName ?? "User"} 👋",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ],
                   ),
                   Stack(
                     children: [
@@ -463,22 +522,26 @@ class _HomePageState extends State<HomePage> {
                 child: isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : (weather == null)
-                    ? const Center(child: Text('Unable to fetch data'))
+                    ? const Center(child: TranslatedText('Unable to fetch data'))
                     : Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _WeatherItem(
                           icon: Icons.location_on,
-                          text: "${weather?['city'] ?? 'Detecting...'}"),
+                          textWidget: Text('${weather?['city'] ?? 'Detecting...'}'),
+                        ),
                         _WeatherItem(
                           icon: Icons.thermostat,
-                          text: weather?['temp'] != null ? '${(weather!['temp'] as num).toStringAsFixed(1)}°C' : '--'),
+                          text: weather?['temp'] != null ? '${(weather!['temp'] as num).toStringAsFixed(1)}°C' : '--',
+                        ),
                         _WeatherItem(
                           icon: Icons.water_drop,
-                          text: weather?['humidity'] != null ? '${weather!['humidity']}%': '--'),
+                          text: weather?['humidity'] != null ? '${weather!['humidity']}%': '--',
+                        ),
                         _WeatherItem(
                           icon: Icons.cloud,
-                          text: '${weather?['condition'] ?? ''}'),
+                          textWidget: Text('${weather?['condition'] ?? ''}'),
+                        ),
                       ],
                       ),
               ),
@@ -497,7 +560,7 @@ class _HomePageState extends State<HomePage> {
                     Icon(riskIcon, color: riskColor),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
+                      child: TranslatedText(
                         riskText,
                         style: TextStyle(
                           color: riskColor,
@@ -538,11 +601,11 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
-                      const Positioned(
+                      Positioned(
                         left: 16,
                         bottom: 16,
-                        child: Text(
-                          "AI-powered detection\nfor Paddy, Tea & Coconut",
+                        child: TranslatedText(
+                          'AI-powered detection\nfor Paddy, Tea & Coconut',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -578,17 +641,16 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 22),
 
               _menuCard(0, Icons.camera_alt, Colors.green,
-                  "Scan Leaf", "Upload or Capture image", () {
+                  const TranslatedText('Scan Leaf'), const TranslatedText('Upload or Capture image'), () {
                 Navigator.pushNamed(context, '/scan');
               }),
-
               _menuCard(1, Icons.menu_book, Colors.orange,
-                  "Knowledge Hub", "Learn diseases & treatments", () {
+                  const TranslatedText('Knowledge Hub'), const TranslatedText('Learn diseases & treatments'), () {
                 Navigator.pushNamed(context, '/knowledge');
               }),
 
               _menuCard(2, Icons.smart_toy, Colors.blue,
-                  "Ask AgroX AI", "Instant farming advice", () {
+                  const TranslatedText('Ask AgroX AI'), const TranslatedText('Instant farming advice'), () {
                 Navigator.pushNamed(context, '/chatbot');
               }),
 
@@ -639,17 +701,19 @@ class _HomePageState extends State<HomePage> {
                   ? Colors.green
                   : (isDark ? Colors.grey : Colors.grey)),
           const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: isSelected ? Colors.green : Colors.grey)),
+            TranslatedText(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isSelected ? Colors.green : Colors.grey),
+            ),
         ],
       ),
     );
   }
 
-  Widget _menuCard(int index, IconData icon, Color color, String title,
-      String subtitle, VoidCallback onTap) {
+    Widget _menuCard(int index, IconData icon, Color color, Widget title,
+      Widget subtitle, VoidCallback onTap) {
     final isSelected = _selectedIndex == index;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -694,16 +758,18 @@ class _HomePageState extends State<HomePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
+                    DefaultTextStyle.merge(
                       style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: isDark ? Colors.white : Colors.black)),
-                  const SizedBox(height: 4),
-                  Text(subtitle,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: isDark ? Colors.white : Colors.black),
+                      child: title),
+                    const SizedBox(height: 4),
+                    DefaultTextStyle.merge(
                       style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? Colors.grey : Colors.grey)),
+                        fontSize: 12,
+                        color: isDark ? Colors.grey : Colors.grey),
+                      child: subtitle),
                 ],
               ),
             ),
@@ -716,22 +782,25 @@ class _HomePageState extends State<HomePage> {
 
 class _WeatherItem extends StatelessWidget {
   final IconData icon;
-  final String text;
+  final String? text;
+  final Widget? textWidget;
 
-  const _WeatherItem({required this.icon, required this.text});
+  const _WeatherItem({required this.icon, this.text, this.textWidget});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final child = textWidget ?? Text(text ?? '',
+        style: TextStyle(
+            fontSize: 13,
+            color: isDark ? Colors.white : Colors.black));
+
     return Row(
       children: [
         Icon(icon, color: Colors.grey, size: 18),
         const SizedBox(width: 5),
-        Text(text,
-            style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.white : Colors.black)),
+        child,
       ],
     );
   }

@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:http/http.dart' 
+import 'package:http/http.dart' as http;
 
-as http;
+// 🔥 ADD
+import 'app_config.dart';
 
 class ApiService {
   static const String baseUrl = "http://127.0.0.1:8000";
@@ -23,6 +24,9 @@ class ApiService {
       );
 
       request.fields["crop"] = crop;
+
+      // 🔥 ADD LANGUAGE
+      request.fields["lang"] = AppConfig.lang;
 
       var response = await request.send();
 
@@ -61,6 +65,9 @@ class ApiService {
 
       request.fields["crop"] = crop;
 
+      // 🔥 ADD LANGUAGE
+      request.fields["lang"] = AppConfig.lang;
+
       var response = await request.send();
 
       var resBody = await response.stream.bytesToString();
@@ -79,7 +86,7 @@ class ApiService {
   }
 
   // =========================
-  // CHATBOT (NEW 🔥)
+  // CHATBOT (UPDATED 🔥)
   // =========================
   static Future<String> askAI(String question) async {
     try {
@@ -92,6 +99,9 @@ class ApiService {
         },
         body: jsonEncode({
           "question": question,
+
+          // 🔥 ADD LANGUAGE
+          "lang": AppConfig.lang,
         }),
       );
 
