@@ -2,6 +2,7 @@ import numpy as np
 from PIL import Image
 from tensorflow.keras.models import load_model
 
+
 # =========================
 # LOAD H5 MODELS 🔥
 # =========================
@@ -11,16 +12,11 @@ tea_model = load_model("models/tea_model.h5")
 
 print("✅ Models loaded")
 
-# =========================
-# CONFIDENCE THRESHOLD 🔥
-# =========================
-CONFIDENCE_THRESHOLD = 0.75
 
 # =========================
-# CLASS LABELS (EXACT MATCH 🔥)
+# CLASS LABELS
 # =========================
 
-# 🥥 COCONUT
 coconut_classes = [
     "CCI_Caterpillars",
     "CCI_Leaflets",
@@ -30,7 +26,6 @@ coconut_classes = [
     "WCLWD_Yellowing"
 ]
 
-# 🌾 RICE
 rice_classes = [
     "Bacterial_Leaf_Blight",
     "Brown_Spot",
@@ -40,7 +35,6 @@ rice_classes = [
     "Sheath_Blight"
 ]
 
-# 🍃 TEA
 tea_classes = [
     "algal_spot",
     "brown_blight",
@@ -50,8 +44,9 @@ tea_classes = [
     "red_spot"
 ]
 
+
 # =========================
-# PREPROCESS (MATCH TRAINING 🔥)
+# PREPROCESS
 # =========================
 def preprocess(image: Image.Image, crop: str):
 
@@ -80,7 +75,6 @@ def preprocess(image: Image.Image, crop: str):
 def predict(image: Image.Image, crop: str):
 
     crop = crop.lower()
-
     img = preprocess(image, crop)
 
     # =========================
@@ -89,14 +83,17 @@ def predict(image: Image.Image, crop: str):
     if crop == "coconut":
         model = coconut_model
         classes = coconut_classes
+        threshold = 0.75
 
     elif crop == "rice":
         model = rice_model
         classes = rice_classes
+        threshold = 0.60   # 🔥 rice fix
 
     elif crop == "tea":
         model = tea_model
         classes = tea_classes
+        threshold = 0.75
 
     else:
         return "unknown", 0.0
@@ -106,15 +103,37 @@ def predict(image: Image.Image, crop: str):
     # =========================
     preds = model.predict(img, verbose=0)[0]
 
-    predicted_index = int(np.argmax(preds))
-    confidence = float(preds[predicted_index])
+    # 🔥 DEBUG FULL OUTPUT
+    print("RAW PREDICTIONS:", preds)
+
+    # =========================
+    # 🔥 TOP-2 FIX (VERY IMPORTANT)
+    # =========================
+    top2 = np.argsort(preds)[-2:][::-1]
+
+    best_idx = int(top2[0])
+    second_idx = int(top2[1])
+
+    best_conf = float(preds[best_idx])
+    second_conf = float(preds[second_idx])
+
+    # 🔥 if predictions too close → switch
+    if abs(best_conf - second_conf) < 0.10:
+        print("⚠️ Close predictions → using second best")
+        predicted_index = second_idx
+        confidence = second_conf
+    else:
+        predicted_index = best_idx
+        confidence = best_conf
+
     predicted_label = classes[predicted_index]
 
     # =========================
-    # 🔥 CONFIDENCE FILTER (KEY FIX)
+    # CONFIDENCE FILTER
     # =========================
-    if confidence < CONFIDENCE_THRESHOLD:
-        print("⚠️ Low confidence → rejecting prediction")
+    if confidence < threshold:
+        print("⚠️ Low confidence → rejecting")
+        print("Confidence:", confidence)
         return "unknown", confidence
 
     # =========================
@@ -122,9 +141,10 @@ def predict(image: Image.Image, crop: str):
     # =========================
     print("----- AI DEBUG -----")
     print("Crop:", crop)
-    print("Index:", predicted_index)
-    print("Label:", predicted_label)
-    print("Confidence:", confidence)
+    print("Best Index:", best_idx, "| Conf:", best_conf)
+    print("Second Index:", second_idx, "| Conf:", second_conf)
+    print("Final Label:", predicted_label)
+    print("Final Confidence:", confidence)
     print("--------------------")
 
     return predicted_label, confidence
