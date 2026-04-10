@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../services/api_service.dart';
 import 'disease_detail_page.dart';
+import '../../widgests/translated_text.dart';
 
 class KnowledgePage extends StatefulWidget {
   const KnowledgePage({super.key});
@@ -63,8 +64,8 @@ class _KnowledgePageState extends State<KnowledgePage> {
     });
   }
 
-  Widget buildTab(
-      String crop, String label, IconData icon, bool isDark) {
+    Widget buildTab(
+      String crop, Widget labelWidget, IconData icon, bool isDark) {
     bool isSelected = selectedCrop == crop;
 
     return GestureDetector(
@@ -76,14 +77,11 @@ class _KnowledgePageState extends State<KnowledgePage> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
               ? Colors.green
-              : (isDark
-                  ? const Color(0xFF2C2C2C)
-                  : Colors.grey.shade200),
+              : (isDark ? const Color(0xFF2C2C2C) : Colors.grey.shade200),
           borderRadius: BorderRadius.circular(30),
           boxShadow: isSelected && !isDark
               ? [
@@ -103,14 +101,14 @@ class _KnowledgePageState extends State<KnowledgePage> {
                     ? Colors.white
                     : (isDark ? Colors.white : Colors.black)),
             const SizedBox(width: 6),
-            Text(
-              label,
+            DefaultTextStyle.merge(
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: isSelected
                     ? Colors.white
                     : (isDark ? Colors.white : Colors.black),
               ),
+              child: labelWidget,
             ),
           ],
         ),
@@ -129,7 +127,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
       appBar: AppBar(
         elevation: 0,
         centerTitle: true,
-        title: const Text('Knowledge Hub'),
+        title: const TranslatedText('Knowledge Hub'),
       ),
 
       body: Padding(
@@ -170,9 +168,9 @@ class _KnowledgePageState extends State<KnowledgePage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                buildTab('rice', 'Rice', Icons.grain, isDark),
-                buildTab('tea', 'Tea', Icons.local_cafe, isDark),
-                buildTab('coconut', 'Coconut', Icons.park, isDark),
+                buildTab('rice', const TranslatedText('Rice'), Icons.grain, isDark),
+                buildTab('tea', const TranslatedText('Tea'), Icons.local_cafe, isDark),
+                buildTab('coconut', const TranslatedText('Coconut'), Icons.park, isDark),
               ],
             ),
 
@@ -240,8 +238,8 @@ class _KnowledgePageState extends State<KnowledgePage> {
                                 crossAxisAlignment:
                                     CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    disease['name'],
+                                  TranslatedText(
+                                    disease['name'] ?? '',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -251,11 +249,10 @@ class _KnowledgePageState extends State<KnowledgePage> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    disease['description'],
+                                  TranslatedText(
+                                    disease['description'] ?? '',
                                     maxLines: 2,
-                                    overflow:
-                                        TextOverflow.ellipsis,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: isDark
                                           ? Colors.grey[400]

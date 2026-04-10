@@ -3,6 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../services/theme_provider.dart';
 
+// 🔥 ADD
+import '../../services/language_provider.dart';
+import '../../widgests/translated_text.dart';
+
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -14,28 +18,70 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _notifications = true;
   final user = FirebaseAuth.instance.currentUser;
 
+  // 🔥 LANGUAGE CHANGE (use provider, no restart)
+  void changeLang(String lang) {
+    final provider =
+        Provider.of<LanguageProvider>(context, listen: false);
+    provider.setLanguage(lang);
+  }
+
+  void _showLanguageBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('English'),
+                onTap: () {
+                  changeLang('en');
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: const Text('සිංහල'),
+                onTap: () {
+                  changeLang('si');
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: const Text('தமிழ்'),
+                onTap: () {
+                  changeLang('ta');
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F7F9),
+      backgroundColor:
+          isDark ? const Color(0xFF121212) : const Color(0xFFF6F7F9),
 
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+        backgroundColor:
+            isDark ? const Color(0xFF121212) : Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back,
               color: isDark ? Colors.white : Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          "Profile",
-          style: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
+        title: const TranslatedText(
+          'Profile',
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
 
@@ -47,10 +93,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
             /// PROFILE CARD
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              padding: const EdgeInsets.symmetric(
+                  vertical: 12, horizontal: 12),
               margin: const EdgeInsets.only(top: 10),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                color: isDark
+                    ? const Color(0xFF1E1E1E)
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
@@ -67,21 +116,26 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
                       children: [
                         Text(
                           user?.displayName ?? "User",
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : Colors.black,
+                            color: isDark
+                                ? Colors.white
+                                : Colors.black,
                           ),
                         ),
                         Text(
                           user?.email ?? "",
                           style: TextStyle(
                             fontSize: 11,
-                            color: isDark ? Colors.grey : Colors.black54,
+                            color: isDark
+                                ? Colors.grey
+                                : Colors.black54,
                           ),
                         ),
                       ],
@@ -92,7 +146,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     onTap: _showEditProfileDialog,
                     child: Icon(Icons.edit,
                         size: 18,
-                        color: isDark ? Colors.white : Colors.black),
+                        color: isDark
+                            ? Colors.white
+                            : Colors.black),
                   )
                 ],
               ),
@@ -104,15 +160,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
             _tile(
               icon: Icons.person,
-              title: "Edit Profile",
-              subtitle: "Update your details",
+              titleWidget: const TranslatedText('Edit Profile', style: TextStyle(fontSize:14,fontWeight: FontWeight.w500)),
+              subtitleWidget: const TranslatedText('Update your details', style: TextStyle(fontSize:11)),
               isDark: isDark,
               onTap: _showEditProfileDialog,
             ),
 
             _tile(
               icon: Icons.lock,
-              title: "Change Password",
+              titleWidget: const TranslatedText('Change Password', style: TextStyle(fontSize:14,fontWeight: FontWeight.w500)),
               subtitle: user?.email ?? "",
               isDark: isDark,
               onTap: _showResetDialog,
@@ -122,7 +178,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
             _sectionTitle("Settings", isDark),
 
-            /// 🔥 SAME SIZE (FIXED)
             _switchTile(
               icon: Icons.dark_mode,
               title: "Dark Mode",
@@ -143,40 +198,48 @@ class _ProfilePageState extends State<ProfilePage> {
               },
             ),
 
+            // =========================
+            // 🌐 LANGUAGE SECTION
+            // =========================
+            const SizedBox(height: 6),
+            _sectionTitle("Language", isDark),
+
+            _tile(
+              icon: Icons.language,
+              title: "Select Language",
+              subtitle: Provider.of<LanguageProvider>(context).language,
+              isDark: isDark,
+              onTap: _showLanguageBottomSheet,
+            ),
+
             const SizedBox(height: 4),
 
             _sectionTitle("About", isDark),
 
-            /// 🔥 SAME SIZE AS TILE (FIXED)
             Container(
               margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              padding: const EdgeInsets.symmetric(
+                  vertical: 12, horizontal: 12),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                color: isDark
+                    ? const Color(0xFF1E1E1E)
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info, color: Colors.green, size: 18),
+                  const Icon(Icons.info,
+                      color: Colors.green, size: 18),
                   const SizedBox(width: 10),
 
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
                       children: [
-                        Text("AgroX",
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white : Colors.black)),
-                        Text("Version 1.0.0",
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? Colors.grey : Colors.black54)),
-                        Text("AI-powered agriculture assistant",
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? Colors.grey : Colors.black54)),
+                            TranslatedText('AgroX', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
+                            TranslatedText('Version 1.0.0', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey : Colors.black54)),
+                            TranslatedText('AI-powered agriculture assistant', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey : Colors.black54)),
                       ],
                     ),
                   ),
@@ -191,16 +254,18 @@ class _ProfilePageState extends State<ProfilePage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius:
+                        BorderRadius.circular(30),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 14),
                 ),
                 onPressed: () async {
                   await FirebaseAuth.instance.signOut();
-                  Navigator.pushReplacementNamed(context, '/login');
+                  Navigator.pushReplacementNamed(
+                      context, '/login');
                 },
-                child: const Text("Logout",
-                    style: TextStyle(color: Colors.white, fontSize: 14)),
+                child: const TranslatedText('Logout', style: TextStyle(color: Colors.white, fontSize: 14)),
               ),
             ),
 
@@ -210,21 +275,25 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
 
       bottomNavigationBar: BottomAppBar(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color:
+            isDark ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 8,
         child: SizedBox(
           height: 60,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment:
+                MainAxisAlignment.spaceAround,
             children: [
-              _navItem(Icons.home, "Home", 0),
-              _navItem(Icons.person, "Profile", 1),
-            ],
+                _navItem(Icons.home, 'Home', 0),
+                _navItem(Icons.person, 'Profile', 1),
+              ],
           ),
         ),
       ),
     );
   }
+
+  
 
   ////////////////////////////////////////////////////////////
 
@@ -238,15 +307,20 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       },
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment:
+            MainAxisAlignment.center,
         children: [
           Icon(icon,
-              color: isSelected ? Colors.green : Colors.grey),
+              color: isSelected
+                  ? Colors.green
+                  : Colors.grey),
           const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: isSelected ? Colors.green : Colors.grey)),
+            TranslatedText(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isSelected ? Colors.green : Colors.grey),
+            ),
         ],
       ),
     );
@@ -255,8 +329,8 @@ class _ProfilePageState extends State<ProfilePage> {
   ////////////////////////////////////////////////////////////
 
   void _showEditProfileDialog() {
-    final controller =
-        TextEditingController(text: user?.displayName ?? "");
+    final controller = TextEditingController(
+        text: user?.displayName ?? "");
 
     showDialog(
       context: context,
@@ -264,15 +338,18 @@ class _ProfilePageState extends State<ProfilePage> {
         title: const Text("Edit Profile"),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(labelText: "Name"),
+          decoration:
+              const InputDecoration(labelText: "Name"),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () =>
+                  Navigator.pop(context),
               child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
-              await user!.updateDisplayName(controller.text);
+              await user!
+                  .updateDisplayName(controller.text);
               Navigator.pop(context);
               setState(() {});
             },
@@ -288,20 +365,25 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Reset Password"),
-        content: Text("Send link to ${user?.email}"),
+        content:
+            Text("Send link to ${user?.email}"),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () =>
+                  Navigator.pop(context),
               child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
               await FirebaseAuth.instance
-                  .sendPasswordResetEmail(email: user!.email!);
+                  .sendPasswordResetEmail(
+                      email: user!.email!);
 
               Navigator.pop(context);
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Reset link sent!")),
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(
+                const SnackBar(
+                    content: Text("Reset link sent!")),
               );
             },
             child: const Text("Send"),
@@ -315,41 +397,56 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _tile({
     required IconData icon,
-    required String title,
-    required String subtitle,
+    String? title,
+    String? subtitle,
+    Widget? titleWidget,
+    Widget? subtitleWidget,
     required bool isDark,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        margin:
+            const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(
+            vertical: 12, horizontal: 12),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: isDark
+              ? const Color(0xFF1E1E1E)
+              : Colors.white,
+          borderRadius:
+              BorderRadius.circular(16),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: Colors.green),
+            Icon(icon,
+                size: 18, color: Colors.green),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? Colors.white : Colors.black)),
-                  Text(subtitle,
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? Colors.grey : Colors.black54)),
+                  titleWidget ?? Text(title ?? '',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight:
+                        FontWeight.w500,
+                      color: isDark
+                        ? Colors.white
+                        : Colors.black)),
+                  subtitleWidget ?? Text(subtitle ?? '',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                        ? Colors.grey
+                        : Colors.black54)),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 12),
+            const Icon(Icons.arrow_forward_ios,
+                size: 12),
           ],
         ),
       ),
@@ -364,21 +461,29 @@ class _ProfilePageState extends State<ProfilePage> {
     required Function(bool) onChanged,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12), // SAME AS TILE
+      margin:
+          const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(
+          vertical: 12, horizontal: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark
+            ? const Color(0xFF1E1E1E)
+            : Colors.white,
+        borderRadius:
+            BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.green),
+          Icon(icon,
+              size: 18, color: Colors.green),
           const SizedBox(width: 10),
           Expanded(
               child: Text(title,
                   style: TextStyle(
                       fontSize: 14,
-                      color: isDark ? Colors.white : Colors.black))),
+                      color: isDark
+                          ? Colors.white
+                          : Colors.black))),
           Switch(value: value, onChanged: onChanged),
         ],
       ),
@@ -388,7 +493,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _sectionTitle(String text, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Text(
+      child: TranslatedText(
         text,
         style: TextStyle(
           fontSize: 12,

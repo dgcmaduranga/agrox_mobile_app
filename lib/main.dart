@@ -23,6 +23,7 @@ import 'features/home/chat_page.dart'; // 🔥 ADD THIS
 
 // Theme
 import 'services/theme_provider.dart';
+import 'services/language_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,8 +33,11 @@ void main() async {
   );
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
+      ],
       child: const AgroXApp(),
     ),
   );
@@ -45,6 +49,8 @@ class AgroXApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    // Listen to language provider so app rebuilds when language changes.
+    Provider.of<LanguageProvider>(context);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
