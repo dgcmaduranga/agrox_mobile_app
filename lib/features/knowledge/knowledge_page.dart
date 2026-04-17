@@ -16,7 +16,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
   List<dynamic> allDiseases = [];
   List<dynamic> filteredDiseases = [];
 
-  String selectedCrop = 'rice';
+  String selectedCrop = 'paddy'; // 🔥 default fix
   String searchText = '';
 
   @override
@@ -25,12 +25,20 @@ class _KnowledgePageState extends State<KnowledgePage> {
     loadData();
   }
 
+  // 🔥 NORMALIZE FUNCTION (IMPORTANT)
+  String normalizeCrop(String crop) {
+    if (crop == "paddy") return "rice";
+    return crop;
+  }
+
   Future<void> loadData() async {
     try {
       final uri = Uri.parse('${ApiService.baseUrl}/diseases');
       final res = await http.get(uri).timeout(const Duration(seconds: 8));
+
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
+
         setState(() {
           allDiseases = (data is List) ? data : [];
           applyFilter();
@@ -47,8 +55,11 @@ class _KnowledgePageState extends State<KnowledgePage> {
   }
 
   void applyFilter() {
-    List temp =
-        allDiseases.where((d) => d['crop'] == selectedCrop).toList();
+    final backendCrop = normalizeCrop(selectedCrop);
+
+    List temp = allDiseases
+        .where((d) => d['crop'] == backendCrop)
+        .toList();
 
     if (searchText.isNotEmpty) {
       temp = temp
@@ -64,7 +75,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
     });
   }
 
-    Widget buildTab(
+  Widget buildTab(
       String crop, Widget labelWidget, IconData icon, bool isDark) {
     bool isSelected = selectedCrop == crop;
 
@@ -72,8 +83,8 @@ class _KnowledgePageState extends State<KnowledgePage> {
       onTap: () {
         setState(() {
           selectedCrop = crop;
-          applyFilter();
         });
+        applyFilter();
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
@@ -134,6 +145,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // 🔍 SEARCH
             Container(
               decoration: BoxDecoration(
                 color: isDark
@@ -165,10 +177,11 @@ class _KnowledgePageState extends State<KnowledgePage> {
 
             const SizedBox(height: 16),
 
+            // 🌱 TABS
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                buildTab('rice', const TranslatedText('Rice'), Icons.grain, isDark),
+                buildTab('paddy', const TranslatedText('Paddy'), Icons.grain, isDark),
                 buildTab('tea', const TranslatedText('Tea'), Icons.local_cafe, isDark),
                 buildTab('coconut', const TranslatedText('Coconut'), Icons.park, isDark),
               ],
@@ -176,104 +189,116 @@ class _KnowledgePageState extends State<KnowledgePage> {
 
             const SizedBox(height: 16),
 
+            // 📋 LIST
             Expanded(
-              child: ListView.builder(
-                itemCount: filteredDiseases.length,
-                itemBuilder: (context, index) {
-                  final disease = filteredDiseases[index];
+              child: filteredDiseases.isEmpty
+                  ? Center(
+                      child: TranslatedText(
+                        "No diseases found",
+                        style: TextStyle(
+                          color: isDark
+                              ? Colors.grey[400]
+                              : Colors.grey[600],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: filteredDiseases.length,
+                      itemBuilder: (context, index) {
+                        final disease = filteredDiseases[index];
 
-                  return TweenAnimationBuilder(
-                    duration:
-                        Duration(milliseconds: 300 + (index * 50)),
-                    tween: Tween<double>(begin: 0, end: 1),
-                    builder: (context, double value, child) {
-                      return Transform.translate(
-                        offset: Offset(0, 30 * (1 - value)),
-                        child: Opacity(opacity: value, child: child),
-                      );
-                    },
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                DiseaseDetailPage(disease: disease),
+                        return TweenAnimationBuilder(
+                          duration:
+                              Duration(milliseconds: 300 + (index * 50)),
+                          tween: Tween<double>(begin: 0, end: 1),
+                          builder: (context, double value, child) {
+                            return Transform.translate(
+                              offset: Offset(0, 30 * (1 - value)),
+                              child: Opacity(opacity: value, child: child),
+                            );
+                          },
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      DiseaseDetailPage(disease: disease),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 14),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? const Color(0xFF1E1E1E)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: isDark
+                                    ? []
+                                    : [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withOpacity(0.05),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 4),
+                                        )
+                                      ],
+                              ),
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.asset(
+                                      disease['image'],
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        TranslatedText(
+                                          disease['name'] ?? '',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: isDark
+                                                ? Colors.white
+                                                : Colors.black,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        TranslatedText(
+                                          disease['description'] ?? '',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: isDark
+                                                ? Colors.grey[400]
+                                                : Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.arrow_forward_ios,
+                                      size: 16,
+                                      color: isDark
+                                          ? Colors.grey[400]
+                                          : Colors.grey[600]),
+                                ],
+                              ),
+                            ),
                           ),
                         );
                       },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 14),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF1E1E1E)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: isDark
-                              ? []
-                              : [
-                                  BoxShadow(
-                                    color: Colors.black
-                                        .withOpacity(0.05),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  )
-                                ],
-                        ),
-                        child: Row(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.asset(
-                                disease['image'],
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  TranslatedText(
-                                    disease['name'] ?? '',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: isDark
-                                          ? Colors.white
-                                          : Colors.black,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  TranslatedText(
-                                    disease['description'] ?? '',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.grey[400]
-                                          : Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(Icons.arrow_forward_ios,
-                                size: 16,
-                                color: isDark
-                                    ? Colors.grey[400]
-                                    : Colors.grey[600]),
-                          ],
-                        ),
-                      ),
                     ),
-                  );
-                },
-              ),
             )
           ],
         ),

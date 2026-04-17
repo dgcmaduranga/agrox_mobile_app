@@ -2,15 +2,14 @@ from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import json
+import traceback
 
 from services.weather_service import get_weather
 from services.ai_service import predict
 
-# 🆕 CHATBOT IMPORT
 from services.chatbot_service import ask_chatbot
 from pydantic import BaseModel
 
-# 🆕 TRANSLATE IMPORT
 from services.translate_service import translate_text
 
 app = FastAPI()
@@ -34,34 +33,50 @@ def home():
     return {"message": "Backend running (H5 models)"}
 
 # =========================
-# WEATHER (UNCHANGED ✅)
+# WEATHER
 # =========================
 @app.get("/weather")
 def weather(lat: float, lon: float):
-    return get_weather(lat, lon)
+    try:
+        return get_weather(lat, lon)
+    except Exception as e:
+        print("WEATHER ERROR:", e)
+        return {"status": "error", "message": "Weather fetch failed"}
 
 # =========================
-# DISEASES (UNCHANGED ✅)
+# DISEASES
 # =========================
 @app.get("/diseases")
 def get_diseases():
-    with open("data/diseases.json") as f:
-        return json.load(f)
+    try:
+        with open("data/diseases.json") as f:
+            return json.load(f)
+    except Exception as e:
+        print("DISEASE ERROR:", e)
+        return []
 
 # =========================
-# RISK (UNCHANGED ✅)
+# RISK
 # =========================
 @app.get("/risk")
 def get_risk():
-    with open("data/diseases.json") as f:
-        return json.load(f)
+    try:
+        with open("data/diseases.json") as f:
+            return json.load(f)
+    except Exception as e:
+        print("RISK ERROR:", e)
+        return []
 
 # =========================
 # LOAD DETECTION JSON
 # =========================
 def load_detection():
-    with open("data/detection.json") as f:
-        return json.load(f)
+    try:
+        with open("data/detection.json") as f:
+            return json.load(f)
+    except Exception as e:
+        print("DETECTION LOAD ERROR:", e)
+        return []
 
 # =========================
 # NORMALIZE
@@ -70,19 +85,23 @@ def normalize(text):
     return text.lower().replace(" ", "_")
 
 # =========================
-# 🔥 GLOBAL TRANSLATE API (NEW)
+# TRANSLATE
 # =========================
 @app.post("/translate")
 def translate_api(
     text: str = Form(...),
     lang: str = Form("en")
 ):
-    return {
-        "translated": translate_text(text, lang)
-    }
+    try:
+        return {
+            "translated": translate_text(text, lang)
+        }
+    except Exception as e:
+        print("TRANSLATE ERROR:", e)
+        return {"translated": text}
 
 # =========================
-# DETECT (UPDATED 🔥)
+# 🔥 DETECT (SUPER STABLE)
 # =========================
 @app.post("/detect")
 async def detect(
@@ -91,12 +110,17 @@ async def detect(
     lang: str = Form("en")
 ):
     try:
+        print("📥 Request received:", crop)
+
+        # read image safely
         image = Image.open(file.file).convert("RGB")
 
+        # 🔥 prediction (main part)
         disease, confidence = predict(image, crop)
 
         print("PREDICTED:", disease, "| CONF:", confidence)
 
+        # ❌ invalid
         if disease == "unknown":
             return {
                 "status": "error",
@@ -123,6 +147,7 @@ async def detect(
                 "message": translate_text("Invalid image for selected crop", lang)
             }
 
+        # 🔥 risk logic
         if confidence >= 0.7:
             risk = "High"
             treatment = data.get("highRiskTreatments", [])
@@ -140,14 +165,16 @@ async def detect(
         }
 
     except Exception as e:
-        print("ERROR:", str(e))
+        print("🔥 DETECT ERROR:")
+        traceback.print_exc()
+
         return {
             "status": "error",
-            "message": translate_text(str(e), lang)
+            "message": "Detection failed (server error)"
         }
 
 # =========================
-# 🆕 CHATBOT (UPDATED 🔥)
+# CHATBOT
 # =========================
 class ChatRequest(BaseModel):
     question: str
@@ -155,7 +182,13 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 def chat(req: ChatRequest):
-    answer = ask_chatbot(req.question)
-    return {
-        "response": translate_text(answer, req.lang)
-    }
+    try:
+        answer = ask_chatbot(req.question)
+        return {
+            "response": translate_text(answer, req.lang)
+        }
+    except Exception as e:
+        print("CHAT ERROR:", e)
+        return {
+            "response": "Chatbot temporarily unavailable"
+        }

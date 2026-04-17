@@ -1,22 +1,46 @@
+
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+# =========================
+# IMPORTS
+# =========================
 import numpy as np
 from PIL import Image
-from tensorflow.keras.models import load_model
 
+import tensorflow as tf
+from keras.models import load_model   # 🔥 FIX (NOT tensorflow.keras)
+from tensorflow.keras.applications.efficientnet import preprocess_input
+
+import base64
+from openai import OpenAI
+from dotenv import load_dotenv
 
 # =========================
-# LOAD H5 MODELS 🔥
+# 🔥 TENSORFLOW SAFE MODE
 # =========================
-coconut_model = load_model("models/coconut_model.h5")
-rice_model = load_model("models/rice_model.h5")
-tea_model = load_model("models/tea_model.h5")
+tf.config.set_visible_devices([], 'GPU')
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
 
-print("✅ Models loaded")
+# =========================
+# LOAD ENV
+# =========================
+load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# =========================
+# LOAD MODELS (🔥 FIXED)
+# =========================
+coconut_model = load_model("models/coconut_model.h5", compile=False, safe_mode=False)
+rice_model = load_model("models/rice_model.h5", compile=False, safe_mode=False)
+tea_model = load_model("models/tea_model.h5", compile=False, safe_mode=False)
+
+print("✅ Models loaded (SAFE MODE)")
 
 # =========================
 # CLASS LABELS
 # =========================
-
 coconut_classes = [
     "CCI_Caterpillars",
     "CCI_Leaflets",
@@ -31,8 +55,8 @@ rice_classes = [
     "Brown_Spot",
     "Healthy_Rice_Leaf",
     "Leaf_Blast",
-    "Leaf_scald",
-    "Sheath_Blight"
+    "Leaf_Scald",
+    "Rice_Tungro"
 ]
 
 tea_classes = [
@@ -44,107 +68,199 @@ tea_classes = [
     "red_spot"
 ]
 
-
 # =========================
 # PREPROCESS
 # =========================
 def preprocess(image: Image.Image, crop: str):
 
-    crop = crop.lower()
+    image = image.resize((300, 300))
+    img_array = np.array(image)
 
     if crop == "rice":
-        size = 380
-    elif crop == "tea":
-        size = 300
-    elif crop == "coconut":
-        size = 300
+        img_array = preprocess_input(img_array)
     else:
-        size = 300
+        img_array = img_array / 255.0
 
-    image = image.resize((size, size))
-
-    img_array = np.array(image) / 255.0
     img_array = np.expand_dims(img_array, axis=0).astype(np.float32)
-
     return img_array
 
 
 # =========================
-# PREDICT FUNCTION 🔥🔥🔥
+# 🤖 GPT LEAF CHECK (SOFT)
+# =========================
+def gpt_leaf_check(image: Image.Image):
+
+    try:
+        import io
+        buf = io.BytesIO()
+        image.save(buf, format="JPEG")
+        img_base64 = base64.b64encode(buf.getvalue()).decode()
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Is this a plant leaf? Answer yes or no."},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}
+                        }
+                    ]
+                }
+            ],
+            max_tokens=5
+        )
+
+        answer = response.choices[0].message.content.lower()
+        print("GPT leaf:", answer)
+
+        return "yes" in answer
+
+    except Exception as e:
+        print("GPT ERROR:", e)
+        return True
+
+
+# =========================
+# 🤖 GPT CROP CHECK (SOFT)
+# =========================
+def gpt_crop_check(image: Image.Image):
+
+    try:
+        import io
+        buf = io.BytesIO()
+        image.save(buf, format="JPEG")
+        img_base64 = base64.b64encode(buf.getvalue()).decode()
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Is this rice, tea, coconut leaf or unknown? Answer one word."},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}
+                        }
+                    ]
+                }
+            ],
+            max_tokens=5
+        )
+
+        answer = response.choices[0].message.content.lower().strip()
+        print("GPT crop:", answer)
+
+        return answer
+
+    except Exception as e:
+        print("GPT crop ERROR:", e)
+        return "unknown"
+
+
+# =========================
+# 🔥 ADVANCED VALIDATION
+# =========================
+def advanced_validation(preds):
+
+    preds = np.array(preds)
+
+    best = np.max(preds)
+    sorted_preds = np.sort(preds)
+    second = sorted_preds[-2]
+    gap = best - second
+
+    entropy = -np.sum(preds * np.log(preds + 1e-10))
+
+    print("Confidence:", best)
+    print("Gap:", gap)
+    print("Entropy:", entropy)
+
+    if best < 0.75:
+        return False
+
+    if gap < 0.15:
+        return False
+
+    if entropy > 1.5:
+        return False
+
+    return True
+
+
+# =========================
+# 🚀 FINAL PREDICT
 # =========================
 def predict(image: Image.Image, crop: str):
 
     crop = crop.lower()
+
+    # =========================
+    # STEP 1: GPT (SOFT)
+    # =========================
+    gpt_leaf = gpt_leaf_check(image)
+    gpt_crop = gpt_crop_check(image)
+
+    print("GPT leaf result:", gpt_leaf)
+    print("GPT crop result:", gpt_crop)
+
+    # =========================
+    # STEP 2: PREPROCESS
+    # =========================
     img = preprocess(image, crop)
 
     # =========================
-    # SELECT MODEL
+    # MODEL SELECT
     # =========================
     if crop == "coconut":
         model = coconut_model
         classes = coconut_classes
-        threshold = 0.75
 
     elif crop == "rice":
         model = rice_model
         classes = rice_classes
-        threshold = 0.60   # 🔥 rice fix
 
     elif crop == "tea":
         model = tea_model
         classes = tea_classes
-        threshold = 0.75
 
     else:
         return "unknown", 0.0
 
     # =========================
-    # PREDICTION
+    # PREDICT
     # =========================
     preds = model.predict(img, verbose=0)[0]
 
-    # 🔥 DEBUG FULL OUTPUT
-    print("RAW PREDICTIONS:", preds)
+    print("RAW:", preds)
 
-    # =========================
-    # 🔥 TOP-2 FIX (VERY IMPORTANT)
-    # =========================
-    top2 = np.argsort(preds)[-2:][::-1]
-
-    best_idx = int(top2[0])
-    second_idx = int(top2[1])
-
-    best_conf = float(preds[best_idx])
-    second_conf = float(preds[second_idx])
-
-    # 🔥 if predictions too close → switch
-    if abs(best_conf - second_conf) < 0.10:
-        print("⚠️ Close predictions → using second best")
-        predicted_index = second_idx
-        confidence = second_conf
-    else:
-        predicted_index = best_idx
-        confidence = best_conf
-
+    predicted_index = int(np.argmax(preds))
+    confidence = float(preds[predicted_index])
     predicted_label = classes[predicted_index]
 
     # =========================
-    # CONFIDENCE FILTER
+    # VALIDATION
     # =========================
-    if confidence < threshold:
-        print("⚠️ Low confidence → rejecting")
-        print("Confidence:", confidence)
+    if not advanced_validation(preds):
+        print("❌ Rejected by model validation")
         return "unknown", confidence
 
-    # =========================
-    # DEBUG
-    # =========================
-    print("----- AI DEBUG -----")
+    # GPT + confidence combo filter
+    if (not gpt_leaf) and confidence < 0.90:
+        print("❌ Not leaf + not strong enough")
+        return "unknown", confidence
+
+    if (crop not in gpt_crop) and confidence < 0.90:
+        print("❌ Crop mismatch + not strong")
+        return "unknown", confidence
+
+    print("----- FINAL RESULT -----")
     print("Crop:", crop)
-    print("Best Index:", best_idx, "| Conf:", best_conf)
-    print("Second Index:", second_idx, "| Conf:", second_conf)
-    print("Final Label:", predicted_label)
-    print("Final Confidence:", confidence)
-    print("--------------------")
+    print("Prediction:", predicted_label)
+    print("Confidence:", confidence)
+    print("------------------------")
 
     return predicted_label, confidence

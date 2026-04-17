@@ -240,11 +240,11 @@
   },
 
   {
-    "id": "brown_spot_rice",
+    "id": "brown_spot_paddy",
     "name": "Brown Spot",
     "crop": "rice",
     "image": "assets/images/diseases/rice/brown_spot.jpg",
-    "description": "Brown Spot causes brown lesions and reduces rice yield.",
+    "description": "Brown Spot causes brown lesions and reduces paddy yield.",
     "symptoms": [
       "Brown circular spots",
       "Yellow leaves"
