@@ -21,7 +21,7 @@ class _DetectPageState extends State<DetectPage> {
   final picker = ImagePicker();
 
   // =========================
-  // 📷 CAMERA
+  // CAMERA
   // =========================
   Future captureImage() async {
     try {
@@ -43,7 +43,7 @@ class _DetectPageState extends State<DetectPage> {
   }
 
   // =========================
-  // 🖼 GALLERY
+  // GALLERY
   // =========================
   Future pickImage() async {
     try {
@@ -65,7 +65,7 @@ class _DetectPageState extends State<DetectPage> {
   }
 
   // =========================
-  // 🔍 DETECT
+  // DETECT
   // =========================
   Future detect() async {
     if (_image == null && webImage == null) {
@@ -105,9 +105,10 @@ class _DetectPageState extends State<DetectPage> {
     setState(() => isLoading = false);
 
     // =========================
-    // HANDLE RESPONSE
+    // 🔥 SMART RESPONSE HANDLING
     // =========================
     if (res != null && res["status"] == "success") {
+      // ✅ normal success
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -115,12 +116,33 @@ class _DetectPageState extends State<DetectPage> {
         ),
       );
     } else {
-      String message = res?["message"] ?? "Detection failed";
+      String label = res?["prediction"] ?? "";
+      String message = res?["message"] ?? "";
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ $message")),
-      );
+      // 🔥 CASE 1: NOT A LEAF
+      if (label == "unknown" && message.contains("leaf")) {
+        showError("⚠️ Please upload a clear leaf image");
+      }
+
+      // 🔥 CASE 2: WRONG CROP
+      else if (label == "unknown") {
+        showError("⚠️ Selected crop does not match the image");
+      }
+
+      // 🔥 DEFAULT
+      else {
+        showError(message.isNotEmpty ? message : "Detection failed");
+      }
     }
+  }
+
+  // =========================
+  // ERROR UI (no UI change)
+  // =========================
+  void showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("❌ $msg")),
+    );
   }
 
   // =========================
@@ -139,7 +161,6 @@ class _DetectPageState extends State<DetectPage> {
           child: Column(
             children: [
 
-              // TITLE
               Text(
                 "Select your crop first",
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
@@ -147,7 +168,6 @@ class _DetectPageState extends State<DetectPage> {
 
               SizedBox(height: 12),
 
-              // CROPS
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -159,7 +179,6 @@ class _DetectPageState extends State<DetectPage> {
 
               SizedBox(height: 25),
 
-              // BUTTONS
               Row(
                 children: [
                   Expanded(
@@ -182,7 +201,6 @@ class _DetectPageState extends State<DetectPage> {
 
               SizedBox(height: 20),
 
-              // IMAGE PREVIEW
               Container(
                 height: 230,
                 width: double.infinity,
@@ -207,7 +225,6 @@ class _DetectPageState extends State<DetectPage> {
 
               SizedBox(height: 25),
 
-              // DETECT BUTTON
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

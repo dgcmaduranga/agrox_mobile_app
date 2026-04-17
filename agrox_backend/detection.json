@@ -166,7 +166,7 @@
     ]
   },
   {
-    "id": "leaf_scald",
+    "id": "leaf_Scald",
     "name": "Leaf Scald",
     "crop": "rice",
     "description": "Leaf Scald causes drying and burning of rice leaves.",
@@ -184,24 +184,28 @@
     ]
   },
   {
-    "id": "sheath_blight",
-    "name": "Sheath Blight",
-    "crop": "rice",
-    "description": "Sheath Blight affects rice stems and reduces yield.",
-    "highRiskTreatments": [
-      "Spray validamycin fungicide",
-      "Reduce nitrogen",
-      "Maintain spacing",
-      "Improve drainage"
-    ],
-    "lowRiskTreatments": [
-      "Remove infected parts",
-      "Reduce density",
-      "Improve airflow",
-      "Keep field clean"
-    ]
+  "id": "rice_tungro",
+  "name": "Rice Tungro",
+  "crop": "rice",
+  "description": "Rice Tungro is a viral disease common in Sri Lanka, spread by green leafhoppers. It causes yellow-orange discoloration, stunted growth, and significant yield reduction.",
+
+  "highRiskTreatments": [
+    "Control green leafhoppers using recommended insecticides (e.g., imidacloprid)",
+    "Remove and destroy infected plants immediately",
+    "Avoid overlapping planting seasons",
+    "Use certified virus-free seedlings",
+    "Plant resistant rice varieties (e.g., Bg resistant types in Sri Lanka)"
+  ],
+
+  "lowRiskTreatments": [
+    "Monitor fields regularly for leafhopper activity",
+    "Maintain proper field sanitation",
+    "Use light traps to reduce insect population",
+    "Ensure balanced fertilization (avoid excess nitrogen)",
+    "Keep field boundaries clean to reduce pest spread"
+  ]
   },
-  {
+    {
     "id": "healthy_rice_leaf",
     "name": "Healthy Rice Leaf",
     "crop": "rice",
