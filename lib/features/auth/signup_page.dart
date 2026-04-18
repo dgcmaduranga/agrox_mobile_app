@@ -195,9 +195,9 @@ class _SignupPageState extends State<SignupPage> {
                     children: [
 
                       const Text(
-                        "Register Account",
+                        "Create Your AgroX Account",
                         style: TextStyle(
-                          fontSize: 28,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -206,7 +206,7 @@ class _SignupPageState extends State<SignupPage> {
 
                       /// 🔥 UPDATED TEXT
                       const Text(
-                        "Sign up with your details or continue with Google",
+                        "Start your smart farming journey today",
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.black54),
                       ),

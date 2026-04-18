@@ -1,4 +1,3 @@
-
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -9,7 +8,7 @@ import numpy as np
 from PIL import Image
 
 import tensorflow as tf
-from keras.models import load_model   # 🔥 FIX (NOT tensorflow.keras)
+from keras.models import load_model
 from tensorflow.keras.applications.efficientnet import preprocess_input
 
 import base64
@@ -30,7 +29,7 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # =========================
-# LOAD MODELS (🔥 FIXED)
+# LOAD MODELS
 # =========================
 coconut_model = load_model("models/coconut_model.h5", compile=False, safe_mode=False)
 rice_model = load_model("models/rice_model.h5", compile=False, safe_mode=False)
@@ -72,7 +71,6 @@ tea_classes = [
 # PREPROCESS
 # =========================
 def preprocess(image: Image.Image, crop: str):
-
     image = image.resize((300, 300))
     img_array = np.array(image)
 
@@ -86,7 +84,7 @@ def preprocess(image: Image.Image, crop: str):
 
 
 # =========================
-# 🤖 GPT LEAF CHECK (SOFT)
+# 🤖 GPT LEAF CHECK (STRICT)
 # =========================
 def gpt_leaf_check(image: Image.Image):
 
@@ -110,11 +108,13 @@ def gpt_leaf_check(image: Image.Image):
                     ]
                 }
             ],
-            max_tokens=5
+            max_tokens=3
         )
 
-        answer = response.choices[0].message.content.lower()
-        print("GPT leaf:", answer)
+        answer = response.choices[0].message.content.lower().strip()
+        answer = answer.replace(".", "").replace(",", "").strip()
+
+        print("GPT leaf RAW:", repr(answer))
 
         return "yes" in answer
 
@@ -124,7 +124,7 @@ def gpt_leaf_check(image: Image.Image):
 
 
 # =========================
-# 🤖 GPT CROP CHECK (SOFT)
+# 🤖 GPT CROP CHECK (SOFT ONLY)
 # =========================
 def gpt_crop_check(image: Image.Image):
 
@@ -140,7 +140,7 @@ def gpt_crop_check(image: Image.Image):
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Is this rice, tea, coconut leaf or unknown? Answer one word."},
+                        {"type": "text", "text": "rice, tea, coconut or unknown? one word only"},
                         {
                             "type": "image_url",
                             "image_url": {"url": f"data:image/jpeg;base64,{img_base64}"}
@@ -148,11 +148,13 @@ def gpt_crop_check(image: Image.Image):
                     ]
                 }
             ],
-            max_tokens=5
+            max_tokens=3
         )
 
         answer = response.choices[0].message.content.lower().strip()
-        print("GPT crop:", answer)
+        answer = answer.replace(".", "").replace(",", "").strip()
+
+        print("GPT crop RAW:", repr(answer))
 
         return answer
 
@@ -179,7 +181,7 @@ def advanced_validation(preds):
     print("Gap:", gap)
     print("Entropy:", entropy)
 
-    if best < 0.75:
+    if best < 0.65:
         return False
 
     if gap < 0.15:
@@ -192,14 +194,14 @@ def advanced_validation(preds):
 
 
 # =========================
-# 🚀 FINAL PREDICT
+# 🚀 FINAL PREDICT (🔥 FIXED)
 # =========================
 def predict(image: Image.Image, crop: str):
 
     crop = crop.lower()
 
     # =========================
-    # STEP 1: GPT (SOFT)
+    # GPT CHECK
     # =========================
     gpt_leaf = gpt_leaf_check(image)
     gpt_crop = gpt_crop_check(image)
@@ -207,8 +209,17 @@ def predict(image: Image.Image, crop: str):
     print("GPT leaf result:", gpt_leaf)
     print("GPT crop result:", gpt_crop)
 
+    # 🚨 HARD RULE: MUST BE LEAF
+    if not gpt_leaf:
+        print("❌ Rejected: Not a leaf (GPT)")
+        return "unknown", 0.0
+
+    # ⚠️ SOFT RULE: crop mismatch (NO REJECT)
+    if crop not in gpt_crop:
+        print("⚠️ Warning: GPT crop mismatch")
+
     # =========================
-    # STEP 2: PREPROCESS
+    # PREPROCESS
     # =========================
     img = preprocess(image, crop)
 
@@ -218,15 +229,12 @@ def predict(image: Image.Image, crop: str):
     if crop == "coconut":
         model = coconut_model
         classes = coconut_classes
-
     elif crop == "rice":
         model = rice_model
         classes = rice_classes
-
     elif crop == "tea":
         model = tea_model
         classes = tea_classes
-
     else:
         return "unknown", 0.0
 
@@ -246,15 +254,6 @@ def predict(image: Image.Image, crop: str):
     # =========================
     if not advanced_validation(preds):
         print("❌ Rejected by model validation")
-        return "unknown", confidence
-
-    # GPT + confidence combo filter
-    if (not gpt_leaf) and confidence < 0.90:
-        print("❌ Not leaf + not strong enough")
-        return "unknown", confidence
-
-    if (crop not in gpt_crop) and confidence < 0.90:
-        print("❌ Crop mismatch + not strong")
         return "unknown", confidence
 
     print("----- FINAL RESULT -----")

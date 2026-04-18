@@ -53,7 +53,7 @@ class _SplashPageState extends State<SplashPage>
 
   /// 🔥 Navigate safely
   void _startTimer() {
-    Timer(const Duration(seconds: 5), () async {
+    Timer(const Duration(seconds: 3), () async {
       if (!mounted) return;
 
       final user = FirebaseAuth.instance.currentUser;
