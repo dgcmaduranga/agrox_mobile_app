@@ -6,6 +6,8 @@ class LanguageProvider extends ChangeNotifier {
 
   String get language => _lang;
 
+  bool get isSinhala => _lang == 'si';
+
   void setLanguage(String lang) {
     if (lang == _lang) return;
     _lang = lang;

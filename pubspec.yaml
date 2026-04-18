@@ -54,6 +54,7 @@ flutter:
     - assets/images/paddy.png
     - assets/images/tea.png
     - assets/images/coconut.png
+    - assets/images/welcome2.png
 
     # 🔹 Disease images (folders)
     - assets/images/diseases/tea/

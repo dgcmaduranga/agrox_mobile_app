@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +8,7 @@ import '../../services/theme_provider.dart';
 // 🔥 ADD
 import '../../services/language_provider.dart';
 import '../../widgests/translated_text.dart';
+import 'change_password_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -26,35 +29,36 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showLanguageBottomSheet() {
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       builder: (context) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('English'),
-                onTap: () {
-                  changeLang('en');
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: const Text('සිංහල'),
-                onTap: () {
-                  changeLang('si');
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: const Text('தமிழ்'),
-                onTap: () {
-                  changeLang('ta');
-                  Navigator.pop(context);
-                },
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 4,
+                  width: 48,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[800] : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                _languageTile('English', 'en'),
+                _languageTile('සිංහල', 'si'),
+                _languageTile('தமிழ்', 'ta'),
+                const SizedBox(height: 12),
+              ],
+            ),
           ),
         );
       },
@@ -91,64 +95,57 @@ class _ProfilePageState extends State<ProfilePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            /// PROFILE CARD
+            /// PROFILE CARD (modern compact)
             Container(
-              padding: const EdgeInsets.symmetric(
-                  vertical: 12, horizontal: 12),
+              padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(top: 10),
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E1E1E)
-                    : Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          offset: const Offset(0, 2),
+                          blurRadius: 6,
+                        )
+                      ],
               ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 22,
                     backgroundColor: Colors.green.shade200,
-                    child: Text(
-                      user?.email?[0].toUpperCase() ?? "U",
-                      style: const TextStyle(fontSize: 14),
-                    ),
+                    child: Text(user?.email?[0].toUpperCase() ?? "U",
+                        style: const TextStyle(fontSize: 14)),
                   ),
                   const SizedBox(width: 12),
 
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          user?.displayName ?? "User",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? Colors.white
-                                : Colors.black,
-                          ),
-                        ),
-                        Text(
-                          user?.email ?? "",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark
-                                ? Colors.grey
-                                : Colors.black54,
-                          ),
-                        ),
+                        Text(user?.displayName ?? "User",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : Colors.black,
+                            )),
+                        const SizedBox(height: 2),
+                        Text(user?.email ?? "",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.grey : Colors.black54,
+                            )),
                       ],
                     ),
                   ),
 
-                  GestureDetector(
-                    onTap: _showEditProfileDialog,
-                    child: Icon(Icons.edit,
-                        size: 18,
-                        color: isDark
-                            ? Colors.white
-                            : Colors.black),
+                  IconButton(
+                    onPressed: _showEditProfileDialog,
+                    icon: Icon(Icons.edit,
+                        size: 18, color: isDark ? Colors.white : Colors.black),
                   )
                 ],
               ),
@@ -171,7 +168,9 @@ class _ProfilePageState extends State<ProfilePage> {
               titleWidget: const TranslatedText('Change Password', style: TextStyle(fontSize:14,fontWeight: FontWeight.w500)),
               subtitle: user?.email ?? "",
               isDark: isDark,
-              onTap: _showResetDialog,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordPage()));
+              },
             ),
 
             const SizedBox(height: 6),
@@ -328,66 +327,77 @@ class _ProfilePageState extends State<ProfilePage> {
 
   ////////////////////////////////////////////////////////////
 
-  void _showEditProfileDialog() {
-    final controller = TextEditingController(
-        text: user?.displayName ?? "");
-
-    showDialog(
+  // Generic styled dialog with backdrop blur
+  Future<T?> _showStyledDialog<T>({required Widget child}) {
+    return showDialog<T>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Edit Profile"),
-        content: TextField(
-          controller: controller,
-          decoration:
-              const InputDecoration(labelText: "Name"),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () =>
-                  Navigator.pop(context),
-              child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              await user!
-                  .updateDisplayName(controller.text);
-              Navigator.pop(context);
-              setState(() {});
-            },
-            child: const Text("Save"),
+      barrierDismissible: true,
+      builder: (ctx) {
+        final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          child: Dialog(
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: child,
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  void _showResetDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Reset Password"),
-        content:
-            Text("Send link to ${user?.email}"),
-        actions: [
-          TextButton(
-              onPressed: () =>
-                  Navigator.pop(context),
-              child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              await FirebaseAuth.instance
-                  .sendPasswordResetEmail(
-                      email: user!.email!);
+  void _showEditProfileDialog() {
+    final controller = TextEditingController(text: user?.displayName ?? "");
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
 
-              Navigator.pop(context);
-
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(
-                const SnackBar(
-                    content: Text("Reset link sent!")),
-              );
-            },
-            child: const Text("Send"),
+    _showStyledDialog(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Edit Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            decoration: InputDecoration(
+              labelText: 'Name',
+              labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              isDense: true,
+            ),
           ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await user!.updateDisplayName(controller.text.trim());
+                    Navigator.pop(context);
+                    setState(() {});
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
+                  } catch (e) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          )
         ],
       ),
     );
@@ -501,6 +511,22 @@ class _ProfilePageState extends State<ProfilePage> {
           color: isDark ? Colors.grey : Colors.black54,
         ),
       ),
+    );
+  }
+
+  Widget _languageTile(String label, String code) {
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+    return ListTile(
+      title: Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
+      onTap: () {
+        changeLang(code);
+        Navigator.pop(context);
+      },
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      trailing: Provider.of<LanguageProvider>(context).language == code
+          ? const Icon(Icons.check, color: Colors.green)
+          : null,
+      tileColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
     );
   }
 }

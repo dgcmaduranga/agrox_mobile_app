@@ -165,7 +165,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(seconds: 5), () {
+    Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         setState(() {
           _showSplash = false;

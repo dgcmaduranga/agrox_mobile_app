@@ -31,7 +31,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     if (!email.contains('@')) {
-      _showError("Enter valid email");
+      _showError("Enter a valid email");
       return;
     }
 
@@ -48,7 +48,7 @@ class _LoginPageState extends State<LoginPage> {
       }
 
     } catch (e) {
-      _showError("Login failed");
+      _showError("Invalid email or password");
     } finally {
       setState(() => _isLoading = false);
     }
@@ -89,8 +89,12 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -131,6 +135,7 @@ class _LoginPageState extends State<LoginPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
+                  /// TOP BAR
                   Row(
                     children: [
                       IconButton(
@@ -149,20 +154,28 @@ class _LoginPageState extends State<LoginPage> {
                   Column(
                     children: [
 
+                      /// 🔥 TITLE (UPDATED)
                       const Text(
-                        "Welcome Back",
+                        "Welcome to AgroX",
                         style: TextStyle(
                           fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
                         ),
+                        textAlign: TextAlign.center,
                       ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
 
+                      /// 🔥 SUBTEXT (UPDATED)
                       const Text(
-                        "Sign in with your email and password\nor continue with Google",
+                        "Sign in to continue your smart farming journey",
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black54),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black54,
+                          height: 1.4,
+                        ),
                       ),
 
                       const SizedBox(height: 30),
@@ -212,12 +225,11 @@ class _LoginPageState extends State<LoginPage> {
 
                       const SizedBox(height: 10),
 
-                      /// 🔥 FIXED BUTTON
                       SizedBox(
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _login,
+                          onPressed: _isLoading ? null : _login,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2E7D32),
                             foregroundColor: Colors.white,
@@ -225,13 +237,22 @@ class _LoginPageState extends State<LoginPage> {
                               borderRadius: BorderRadius.circular(30),
                             ),
                           ),
-                          child: const Text(
-                            "Continue", // ✅ FIX
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  "Continue",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                         ),
                       ),
 
@@ -254,12 +275,12 @@ class _LoginPageState extends State<LoginPage> {
                         width: double.infinity,
                         height: 50,
                         child: OutlinedButton.icon(
-                          onPressed: _signInWithGoogle,
+                          onPressed: _isLoading ? null : _signInWithGoogle,
                           icon: Image.network(
                             'https://img.icons8.com/color/48/google-logo.png',
                             height: 20,
                           ),
-                          label: const Text("Continue with Google"),
+                          label: const Text("Sign in with Google"),
                           style: OutlinedButton.styleFrom(
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30),
@@ -296,8 +317,7 @@ class _LoginPageState extends State<LoginPage> {
 
             if (_isLoading)
               Container(
-                color: Colors.black.withOpacity(0.3),
-                child: const Center(child: CircularProgressIndicator()),
+                color: Colors.black.withOpacity(0.2),
               ),
           ],
         ),
@@ -346,7 +366,10 @@ class _LoginPageState extends State<LoginPage> {
 
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
-          borderSide: const BorderSide(color: Colors.blue, width: 2),
+          borderSide: const BorderSide(
+            color: Color(0xFF2E7D32),
+            width: 2,
+          ),
         ),
       ),
     );
