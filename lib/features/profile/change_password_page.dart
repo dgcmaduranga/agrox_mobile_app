@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../services/theme_provider.dart';
+import '../../services/language_provider.dart';
+import '../../widgests/translated_text.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({Key? key}) : super(key: key);
@@ -60,10 +62,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Provider.of<ThemeProvider>(context).isDark;
+    // listen to language provider so UI updates when language changes
+    final lang = Provider.of<LanguageProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Change Password'),
+        title: TranslatedText('change password', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
         backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
         elevation: 0,
         iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
@@ -76,7 +80,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 6),
-            Text('Change your account password', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[800], fontSize: 14)),
+            TranslatedText('change password description', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[800], fontSize: 14)),
             const SizedBox(height: 16),
 
             Container(
@@ -94,8 +98,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       obscureText: !_showCurrent,
                       style: TextStyle(color: isDark ? Colors.white : Colors.black),
                       decoration: InputDecoration(
-                        labelText: 'Current Password',
-                        labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+                        label: TranslatedText('current password', style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700])),
                         filled: true,
                         fillColor: isDark ? Colors.transparent : Colors.white,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
@@ -113,8 +116,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       obscureText: !_showNew,
                       style: TextStyle(color: isDark ? Colors.white : Colors.black),
                       decoration: InputDecoration(
-                        labelText: 'New Password',
-                        labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+                        label: TranslatedText('new password', style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700])),
                         filled: true,
                         fillColor: isDark ? Colors.transparent : Colors.white,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
@@ -136,8 +138,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       obscureText: !_showConfirm,
                       style: TextStyle(color: isDark ? Colors.white : Colors.black),
                       decoration: InputDecoration(
-                        labelText: 'Confirm New Password',
-                        labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
+                        label: TranslatedText('confirm new password', style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700])),
                         filled: true,
                         fillColor: isDark ? Colors.transparent : Colors.white,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
@@ -166,7 +167,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                         onPressed: _loading ? null : _updatePassword,
                         child: _loading
                             ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('Update Password', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                            : TranslatedText('update password', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                       ),
                     ),
                   ],

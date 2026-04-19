@@ -103,13 +103,16 @@ class AgroXApp extends StatelessWidget {
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         primaryColor: Colors.green,
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.green,
-          brightness: Brightness.dark,
+        // Global scaffold background: neutral deep gray/black
+        scaffoldBackgroundColor: const Color(0xFF0B0F14),
+        // Use explicit dark color scheme to avoid material blue tint
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF22C55E),
+          background: Color(0xFF0B0F14),
+          surface: Color(0xFF161B22),
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1E1E1E),
+          backgroundColor: Color(0xFF1C2128),
           elevation: 0,
           iconTheme: IconThemeData(color: Colors.white),
           titleTextStyle: TextStyle(
@@ -118,7 +121,8 @@ class AgroXApp extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        cardColor: const Color(0xFF1E1E1E),
+        // Card / container surfaces
+        cardColor: const Color(0xFF161B22),
         useMaterial3: true,
       ),
 

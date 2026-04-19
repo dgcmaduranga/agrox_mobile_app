@@ -1,15 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/services.dart' show rootBundle;
+
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
+
 import '../../services/api_service.dart';
 import '../../services/weather_service.dart';
+import '../../services/location_service.dart';
+import '../../services/risk_service.dart';
+import '../../models/disease_model.dart';
+import '../../services/theme_provider.dart';
+import '../../services/language_provider.dart';
 import '../../widgests/translated_text.dart';
-import 'package:geocoding/geocoding.dart';
-import '../../services/geocoding_service.dart';
+import '../../widgests/floating_bottom_nav.dart';
+import 'notification_page.dart';
+// NOTE: TranslatedText (existing app widget) is used for translations on this page.
+
+// NOTE: Translations are provided at runtime by TranslationService.
+// UI source strings MUST be plain English. Use `TText` to render translated text.
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,757 +30,472 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  final PageController _pageController = PageController();
-  Timer? _carouselTimer;
+  // Debug coords (optional)
+  static const bool _forceDebugCoords = false;
+  static const double _debugLat = 5.9485;
+  static const double _debugLon = 80.5353;
 
-  int _currentIndex = 0;
-  int _bottomIndex = 0;
-  bool _forward = true;
-
-  int _selectedIndex = -1;
-  bool _isFabPressed = false;
-
-  // === Risk alert state ===
-  List allDiseases = [];
-  String riskText = "Checking risk...";
-  Color riskColor = Colors.orange;
-  IconData riskIcon = Icons.warning_amber_rounded;
-
-  /// 🔥 WEATHER DATA
   Map<String, dynamic>? weather;
   bool isLoading = true;
 
-  // No API keys in the Flutter app. Weather comes from backend.
+  List<dynamic> riskList = [];
+  String riskText = "Checking risk...";
+  Color riskColor = Colors.green;
+  IconData riskIcon = Icons.check_circle;
 
-  final List<String> images = [
-    "assets/images/paddy.png",
-    "assets/images/tea.png",
-    "assets/images/coconut.png",
+  Timer? _refreshTimer;
+  int _bottomIndex = 0;
+  int _selectedFeature = -1;
+  bool _isFabPressed = false;
+  String? _selectedCrop;
+
+  // Crops list
+  final List<Map<String, String>> crops = [
+    {'key': 'coconut', 'label': 'Coconut', 'asset': 'assets/images/coconut.png'},
+    {'key': 'tea', 'label': 'Tea', 'asset': 'assets/images/tea.png'},
+    {'key': 'rice', 'label': 'Rice', 'asset': 'assets/images/paddy.png'},
   ];
-
-  String getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
-  }
 
   @override
   void initState() {
     super.initState();
-
-    // Observe app lifecycle to refresh location when app resumes
     WidgetsBinding.instance.addObserver(this);
-
-    // Load location, weather and risk data (force fresh GPS)
-    loadData();
-
-    _carouselTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (!mounted) return;
-
-      setState(() {
-        if (_forward) {
-          if (_currentIndex < images.length - 1) {
-            _currentIndex++;
-          } else {
-            _forward = false;
-            _currentIndex--;
-          }
-        } else {
-          if (_currentIndex > 0) {
-            _currentIndex--;
-          } else {
-            _forward = true;
-            _currentIndex++;
-          }
-        }
-      });
-
-      if (_pageController.hasClients) {
-        _pageController.animateToPage(
-          _currentIndex,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-        );
-      }
-
-      // Recalculate risk for the currently visible crop
-      calculateRisk();
+    _loadAll();
+    _refreshTimer = Timer.periodic(const Duration(minutes: 10), (_) {
+      if (mounted) _loadAll();
     });
   }
 
   @override
   void dispose() {
-    _carouselTimer?.cancel();
-    _pageController.dispose();
+    _refreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) {
-      // App returned to foreground — refresh location and weather
-      loadData();
-    }
+    if (state == AppLifecycleState.resumed) _loadAll();
   }
 
-  ///////////////////////////////////////////////////////////////
-  /// 🔥 GET LOCATION + WEATHER
-  ///////////////////////////////////////////////////////////////
-
-  // Orchestrator: get coords, fetch weather, reverse geocode place name
-  Future<void> loadData() async {
+  Future<void> _loadAll() async {
     setState(() {
       isLoading = true;
       riskText = "Checking risk...";
+      riskColor = Colors.green;
+      riskIcon = Icons.check_circle;
     });
 
-    // 1) Get fresh coordinates from device GPS (do NOT use hardcoded or cached values)
-    final coords = await getLocation();
-    if (coords == null) {
-      // Could not obtain fresh location — show error instead of using fallback coordinates
+    final loc = await LocationService.getCurrentLocation();
+    if (loc == null) {
       setState(() {
         isLoading = false;
         weather = null;
-        allDiseases = [];
-        riskText = "Unable to fetch data";
+        riskList = [];
+        riskText = "Location unavailable";
       });
       return;
     }
+    double lat = loc['lat'] as double;
+    double lon = loc['lon'] as double;
 
-    final double lat = coords['lat']!.toDouble();
-    final double lon = coords['lon']!.toDouble();
+    if (_forceDebugCoords) {
+      // ignore: avoid_print
+      print('HomePage: DEBUG forcing coords to $_debugLat,$_debugLon');
+      lat = _debugLat;
+      lon = _debugLon;
+    }
 
-    // 2) Fetch weather via WeatherService and risk via backend
     try {
-      final weatherService = WeatherService();
-      final w = await weatherService.getWeather(lat, lon);
-      final r = await fetchRisk(lat, lon);
-
-      if (w == null) {
-        // API failed
-        setState(() {
-          isLoading = false;
-          weather = null;
-          allDiseases = r ?? [];
-          riskText = "Unable to fetch data";
-        });
-        return;
-      }
-
-      // Debug: print full parsed response from WeatherService
+      final weatherSvc = WeatherService();
       // ignore: avoid_print
-      print('WeatherService returned: $w');
+      print('HomePage: fetching weather for lat=$lat, lon=$lon');
+      final w = await weatherSvc.getWeather(lat, lon);
 
-      // Extract values (support both data['main']['temp'] and data['temp'])
-      final dynamic rawTemp = w['temp'];
+      // prefer LocationService city if available
+      final cityName = (loc['city'] as String?) ?? '';
+
+      final dynamic rawTemp = w?['temp'];
       final double? tempVar = rawTemp is num ? (rawTemp as num).toDouble() : (rawTemp is String ? double.tryParse(rawTemp) : null);
-      final int? humidityVar = w['humidity'] is int ? (w['humidity'] as int) : (w['humidity'] is num ? (w['humidity'] as num).toInt() : null);
-      final String? condVar = (w['condition'] != null) ? w['condition'].toString() : null;
+      final int? humidityVar = (w != null && w['humidity'] != null) ? (w['humidity'] is num ? (w['humidity'] as num).toInt() : int.tryParse(w['humidity'].toString()) ?? null) : null;
 
-      // Print temp before UI update for debugging
-      // ignore: avoid_print
-      print('Parsed temp before UI update: $tempVar');
+      final diseases = await fetchDiseases();
 
-      // Use backend-provided city if present; show 'Detecting...' while reverse geocoding
-      final String apiCity = (w['city'] != null && w['city'].toString().isNotEmpty) ? w['city'].toString() : 'Detecting...';
+      final bool hasRain = (w != null && (w['raw'] != null) && ((w['raw']['rain'] != null) || (w['raw']['weather'] != null && (w['raw']['weather'] as List).any((it) => (it['main']?.toString().toLowerCase() ?? '').contains('rain')))));
 
-      // Update UI immediately with weather data returned from backend
+      final cropKeys = crops.map((c) => (c['key'] ?? '').toString().toLowerCase()).where((s) => s.isNotEmpty).toList();
+      final scored = RiskService.selectTopPerCrop(diseases, tempVar, humidityVar, hasRain, cropOrder: cropKeys, limit: 3);
+
       setState(() {
         weather = {
           ...?w,
           'temp': tempVar,
           'humidity': humidityVar,
-          'condition': condVar ?? '',
-          'city': apiCity,
+          'city': (cityName.isNotEmpty) ? cityName : (w != null && (w['city']?.toString().isNotEmpty ?? false) ? w['city'] : 'Nearby'),
         };
-        allDiseases = r ?? [];
+        riskList = scored.map((d) => d.toJson()).toList();
         isLoading = false;
       });
 
-      // Run reverse geocoding asynchronously (do not block UI). Prefer Google Geocoding API.
-      _reverseGeocodeAndUpdate(lat, lon, apiCity: apiCity);
-
-      calculateRisk();
+      _calculateRiskSummary();
     } catch (e) {
-      // General failure
-      // ignore: avoid_print
-      print('Weather load failed: $e');
       setState(() {
         isLoading = false;
         weather = null;
-        allDiseases = [];
+        riskList = [];
         riskText = "Unable to fetch data";
       });
     }
   }
 
-  // Returns {'lat': .., 'lon': ..} or null if unavailable.
-  // Public wrapper named `getLocation` per requirements.
-  Future<Map<String, double>?> getLocation() async {
-    return await getLocationCoordinates();
-  }
-
-  /// Reverse geocode coordinates to a readable city/locality and update UI.
-  /// Keeps a safe fallback and never throws to the UI.
-  Future<void> _reverseGeocodeAndUpdate(double lat, double lon, {String? apiCity}) async {
+  Future<List<Disease>> fetchDiseases() async {
     try {
-      final name = await GeocodingService.getBestLocationName(lat, lon);
-      final chosen = (name != null && name.trim().isNotEmpty) ? name.trim() : 'Unknown Location';
-
-      if (!mounted) return;
-      setState(() {
-        weather = {
-          ...?weather,
-          'city': chosen,
-        };
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          weather = {
-            ...?weather,
-            'city': 'Unknown Location',
-          };
-        });
-      }
-      // ignore: avoid_print
-      print('Reverse geocoding (Nominatim) failed: $e');
-    }
-  }
-
-  Future<Map<String, double>?> getLocationCoordinates() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        // Location services are disabled on the device.
-        print('Location services disabled.');
-        return null;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied) {
-        print('Location permission denied by user.');
-        return null;
-      }
-      if (permission == LocationPermission.deniedForever) {
-        print('Location permission permanently denied.');
-        return null;
-      }
-
-      // IMPORTANT: force fresh GPS location with highest practical accuracy
-      final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-        timeLimit: const Duration(seconds: 15),
-      );
-
-      return {'lat': pos.latitude, 'lon': pos.longitude};
-    } catch (e) {
-      print('getLocationCoordinates failed: $e');
-      // Do NOT use last known position or cached coordinates per requirements.
-      return null;
-    }
-  }
-
-  // Weather API calls are handled in services/weather_service.dart
-
-  // Load diseases JSON from assets
-  Future<void> loadDiseases() async {
-    try {
-      final uri = Uri.parse('${ApiService.baseUrl}/risk');
+      final uri = Uri.parse('${ApiService.baseUrl}/diseases');
       final resp = await http.get(uri).timeout(const Duration(seconds: 8));
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
-        setState(() {
-          allDiseases = (data is List) ? data : [];
-        });
-      } else {
-        print('Failed to load diseases from backend: ${resp.statusCode}');
-        setState(() {
-          allDiseases = [];
-        });
-      }
-    } catch (e) {
-      // Networking or parsing error: fallback to empty list and log
-      print('Failed to load diseases from backend: $e');
-      setState(() {
-        allDiseases = [];
-      });
-    }
-  }
-
-  Future<List<dynamic>?> fetchRisk(double lat, double lon) async {
-    try {
-      final uri = Uri.parse('${ApiService.baseUrl}/risk?lat=$lat&lon=$lon');
-      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
-      if (resp.statusCode == 200) {
-        final data = json.decode(resp.body);
-        return (data is List) ? data : [];
+        if (data is List) {
+          return data.map((e) => Disease.fromJson(e as Map<String, dynamic>)).toList();
+        }
       }
       return [];
     } catch (e) {
-      print('fetchRisk error: $e');
       return [];
     }
   }
 
-  // Evaluate all diseases against current weather and build a risk alert
-  void calculateRisk() {
-    if (weather == null || allDiseases.isEmpty) return;
-
-    // Cast once to a non-null map to avoid repeated null checks.
-    final Map<String, dynamic> w = weather as Map<String, dynamic>;
-
-    final double tempVal = (w['temp'] is int)
-        ? (w['temp'] as int).toDouble()
-        : (w['temp'] as double? ?? 0.0);
-    final int humidityVal = (w['humidity'] as int?) ?? 0;
-    final double rainVal = (w['rain'] is int)
-        ? (w['rain'] as int).toDouble()
-        : (w['rain'] as double? ?? 0.0);
-
-    final String selectedCrop = images.isNotEmpty
-        ? images[_currentIndex].split('/').last.split('.').first.toLowerCase()
-        : '';
-
-    int bestScore = -1;
-    String bestDisease = '';
-
-    for (var d in allDiseases) {
-      final risk = d['riskConditions'];
-      if (risk == null) continue;
-
-      // Crop-based filtering: check `crop` or `crops` fields if present
-      final cropField = d['crop'];
-      final cropsField = d['crops'];
-      if (cropField != null) {
-        if (cropField.toString().toLowerCase() != selectedCrop) continue;
-      } else if (cropsField != null && cropsField is List) {
-        final lower = cropsField.map((e) => e.toString().toLowerCase()).toList();
-        if (!lower.contains(selectedCrop)) continue;
-      }
-
-      final int minT = (risk['minTemp'] as num?)?.toInt() ?? -999;
-      final int maxT = (risk['maxTemp'] as num?)?.toInt() ?? 999;
-      final int minH = (risk['minHumidity'] as num?)?.toInt() ?? 0;
-      final bool needRain = (risk['rainRequired'] == true);
-
-      final bool tempOk = tempVal >= minT && tempVal <= maxT;
-      final bool humidityOk = humidityVal >= minH;
-      final bool rainOk = !needRain || rainVal > 0;
-
-      int score = 0;
-      if (tempOk) score++;
-      if (humidityOk) score++;
-      if (rainOk) score++;
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestDisease = d['name'] ?? 'Unknown';
-      }
-    }
-
-    setState(() {
-      if (bestScore <= 0) {
-        // No meaningful match
+  void _calculateRiskSummary() {
+    if (riskList.isEmpty) {
+      setState(() {
         riskText = "Low Risk";
         riskColor = Colors.green;
         riskIcon = Icons.check_circle;
-      } else if (bestScore == 1) {
-        // Barely matching
-        riskText = "Low Risk for $bestDisease";
-        riskColor = Colors.green;
-        riskIcon = Icons.check_circle;
-      } else if (bestScore == 2) {
-        // Partial match
-        riskText = "Medium Risk for $bestDisease";
-        riskColor = const Color.fromARGB(255, 232, 120, 46);
-        riskIcon = Icons.warning_amber_rounded;
-      } else {
-        // Full match
-        riskText = "High Risk for $bestDisease";
+      });
+      return;
+    }
+
+    int highCount = 0;
+    for (var d in riskList) {
+      final severity = (d['severity'] ?? '').toString().toLowerCase();
+      if (severity.contains('high') || severity.contains('severe')) highCount++;
+    }
+
+    setState(() {
+      if (highCount >= 3 || riskList.length >= 5) {
+        riskText = "High disease risk";
         riskColor = Colors.red;
         riskIcon = Icons.warning;
+      } else if (highCount > 0) {
+        riskText = "Medium disease risk";
+        riskColor = Colors.orange;
+        riskIcon = Icons.warning_amber_rounded;
+      } else {
+        riskText = "Low Risk";
+        riskColor = Colors.green;
+        riskIcon = Icons.check_circle;
       }
     });
+  }
+
+  bool get _showRiskDot {
+    try {
+      return riskList.isNotEmpty && (riskList.take(3).any((d) => (d['score'] ?? 0) > 0));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _showRiskModal() {
+    final topMaps = (riskList.isNotEmpty) ? riskList.take(3).toList() : [];
+    final topDiseases = topMaps.map((m) {
+      final Map<String, dynamic> map = Map<String, dynamic>.from(m as Map);
+      final d = Disease.fromJson(map);
+      if (map['score'] != null) d.score = (map['score'] is num) ? (map['score'] as num).toInt() : int.tryParse(map['score'].toString()) ?? 0;
+      if (map['percent'] != null) d.percent = (map['percent'] is num) ? (map['percent'] as num).toDouble() : double.tryParse(map['percent']?.toString() ?? '') ?? 0.0;
+      if (map['severity'] != null) d.severity = map['severity'].toString();
+      return d;
+    }).toList();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (ctx) => NotificationPage(diseases: topDiseases)),
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    final weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dt.weekday % 7];
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    final year = dt.year.toString();
+    return '$weekday, $day/$month/$year';
+  }
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Provider.of<ThemeProvider>(context);
+    final langProvider = Provider.of<LanguageProvider>(context);
+    final isDark = theme.isDark;
+    final mq = MediaQuery.of(context);
+    final double padding = 16.0;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF121212)
-          : const Color.fromARGB(255, 248, 247, 247),
-
-      floatingActionButton: GestureDetector(
-        onTapDown: (_) => setState(() => _isFabPressed = true),
-        onTapUp: (_) {
-          setState(() => _isFabPressed = false);
-          Navigator.pushNamed(context, '/scan');
-        },
-        onTapCancel: () => setState(() => _isFabPressed = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          height: 62,
-          width: 62,
-          transform: _isFabPressed
-              ? (Matrix4.identity()..scale(0.9))
-              : Matrix4.identity(),
-          decoration: BoxDecoration(
-            color: isDark
-            ? const Color(0xFF1E1E1E)
-            :Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: _isFabPressed
-                  ? Colors.green.shade800
-                  : Colors.green.shade300,
-              width: _isFabPressed ? 3 : 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              )
-            ],
-          ),
-          child: Icon(
-            Icons.camera_alt,
-            size: 26,
-            color: _isFabPressed
-                ? Colors.green.shade900
-                : Colors.green.shade700,
-          ),
-        ),
-      ),
-
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-
+      extendBody: true,
+      resizeToAvoidBottomInset: false,
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F7F9),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: ListView(
-            children: [
-              const SizedBox(height: 12),
-
-              /// HEADER
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 40),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: mq.size.height - 40),
+            child: IntrinsicHeight(
+              child: Column(
                 children: [
-                  Row(
+                  // Header with floating weather card (full-width)
+                  Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      TranslatedText(
-                        getGreeting(),
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : Colors.black),
+                      SizedBox(
+                        width: double.infinity,
+                        child: HeaderWidget(
+                          greeting: _greeting(),
+                          userName: user?.displayName ?? 'User',
+                          date: _formatDate(DateTime.now()),
+                          showRiskDot: _showRiskDot,
+                          onBellTap: _showRiskModal,
+                          isDark: isDark,
+                          avatarInitial: (user?.email?.isNotEmpty == true) ? user!.email![0].toUpperCase() : 'U',
+                        ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        ", ${user?.displayName ?? "User"} 👋",
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : Colors.black,
+
+                      Positioned(
+                        top: 120,
+                        left: padding,
+                        right: padding,
+                        child: Transform.translate(
+                          offset: const Offset(0, -20),
+                          child: WeatherCard(
+                            weather: weather,
+                            isLoading: isLoading,
+                            isDark: isDark,
+                            statusText: riskText,
+                            statusColor: riskColor,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  Stack(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.notifications_none,
-                            color: isDark ? Colors.white : Colors.black),
-                        onPressed: () {},
-                      ),
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          height: 8,
-                          width: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
+
+                  const SizedBox(height: 120),
+
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: padding),
+                    child: Column(
+                      children: [
+                        PremiumCard(
+                          icon: Icons.camera_alt,
+                          title: 'Disease Detection',
+                          subtitle: 'Capture or upload leaf image',
+                          color: Colors.green,
+                          onTap: () => Navigator.pushNamed(context, '/scan'),
+                          isDark: isDark,
+                        ),
+                        const SizedBox(height: 12),
+                        PremiumCard(
+                          icon: Icons.menu_book,
+                          title: 'Knowledge Hub',
+                          subtitle: 'Learn diseases & treatments',
+                          color: Colors.orange,
+                          onTap: () => Navigator.pushNamed(context, '/knowledge'),
+                          isDark: isDark,
+                        ),
+                        const SizedBox(height: 12),
+                        PremiumCard(
+                          icon: Icons.smart_toy,
+                          title: 'Ask AgroX AI',
+                          subtitle: 'Instant farming advice',
+                          color: Colors.blue,
+                          onTap: () => Navigator.pushNamed(context, '/chatbot'),
+                          isDark: isDark,
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TranslatedText('Best Fields', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black)),
+                            TextButton(onPressed: () {}, child: TranslatedText('See All', style: TextStyle(color: Colors.green.shade700))),
+                          ],
+                        ),
+
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 120,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: crops.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (context, i) {
+                              final c = crops[i];
+                              return CropCard(label: c['label']!, asset: c['asset']!, isDark: isDark);
+                            },
                           ),
                         ),
-                      )
-                    ],
-                  )
+
+                        const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: FloatingBottomNav(
+        activeIndex: _bottomIndex,
+        isDark: isDark,
+        showCenterButton: true,
+        onTap: (i) {
+          if (i == 0) {
+            setState(() => _bottomIndex = 0);
+          } else if (i == 1) {
+            setState(() => _bottomIndex = 1);
+            Navigator.pushNamed(context, '/profile');
+          }
+        },
+        onCenterTap: () => Navigator.pushNamed(context, '/scan'),
+      ),
+    );
+  }
+}
 
-              const SizedBox(height: 20),
 
-              /// 🔥 WEATHER UPDATED
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(14),
+/// Header widget with green gradient curved background, greeting, date, avatar and bell.
+class CustomHeaderClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    Path path = Path();
+
+    path.lineTo(0, size.height - 40);
+
+    path.quadraticBezierTo(
+      size.width / 2,
+      size.height + 40,
+      size.width,
+      size.height - 40,
+    );
+
+    path.lineTo(size.width, 0);
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+
+class HeaderWidget extends StatelessWidget {
+  final String greeting;
+  final String userName;
+  final String date;
+  final bool showRiskDot;
+  final VoidCallback onBellTap;
+  final bool isDark;
+  final String avatarInitial;
+
+  const HeaderWidget({
+    required this.greeting,
+    required this.userName,
+    required this.date,
+    required this.showRiskDot,
+    required this.onBellTap,
+    required this.isDark,
+    required this.avatarInitial,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const height = 150.0;
+    return ClipPath(
+      clipper: CustomHeaderClipper(),
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(35), bottomRight: Radius.circular(35)),
+          image: const DecorationImage(
+            image: AssetImage('assets/images/home.png'),
+            fit: BoxFit.cover,
+          ),
+          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 12, offset: const Offset(0, 6))],
+        ),
+        child: Stack(
+          children: [
+            // dark overlay + slight blur to improve readability
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 2.0, sigmaY: 2.0),
+                child: Container(
+                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.32), borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(35), bottomRight: Radius.circular(35))),
                 ),
-                child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : (weather == null)
-                    ? const Center(child: TranslatedText('Unable to fetch data'))
-                    : Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _WeatherItem(
-                          icon: Icons.location_on,
-                          textWidget: Text('${weather?['city'] ?? 'Detecting...'}'),
-                        ),
-                        _WeatherItem(
-                          icon: Icons.thermostat,
-                          text: weather?['temp'] != null ? '${(weather!['temp'] as num).toStringAsFixed(1)}°C' : '--',
-                        ),
-                        _WeatherItem(
-                          icon: Icons.water_drop,
-                          text: weather?['humidity'] != null ? '${weather!['humidity']}%': '--',
-                        ),
-                        _WeatherItem(
-                          icon: Icons.cloud,
-                          textWidget: Text('${weather?['condition'] ?? ''}'),
-                        ),
-                      ],
-                      ),
               ),
-
-              const SizedBox(height: 14),
-
-              /// RISK ALERT
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: riskColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    Icon(riskIcon, color: riskColor),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TranslatedText(
-                        riskText,
-                        style: TextStyle(
-                          color: riskColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              /// CAROUSEL (same)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SizedBox(
-                  height: 170,
-                  child: Stack(
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 30, 16, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      // greeting (English source) + capitalize username
+                      Builder(builder: (ctx) {
+                        String name = userName.trim();
+                        if (name.isNotEmpty) {
+                          final parts = name.split(' ');
+                          name = parts.map((p) => p.isEmpty ? p : (p[0].toUpperCase() + p.substring(1))).join(' ');
+                        }
+                        // Use TranslatedText for the greeting phrase and append the name as plain text
+                        return Row(children: [
+                          TranslatedText('${greeting}, ', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                          Text('${name.isNotEmpty ? name : 'User'} 👋', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                        ]);
+                      }),
+                      const SizedBox(height: 6),
+                      Text(date, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    ]),
+                  ),
+                  Column(
                     children: [
-                      PageView.builder(
-                        controller: _pageController,
-                        itemCount: images.length,
-                        itemBuilder: (context, index) {
-                          return Image.asset(
-                            images[index],
-                            fit: BoxFit.cover,
-                          );
-                        },
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.black.withOpacity(0.5),
-                              Colors.transparent
-                            ],
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: onBellTap,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                const Icon(Icons.notifications_none, color: Colors.white, size: 26),
+                                if (showRiskDot)
+                                  Positioned(top: -4, right: -4, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 2)]))),
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 16,
-                        bottom: 16,
-                        child: TranslatedText(
-                          'AI-powered detection\nfor Paddy, Tea & Coconut',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                          const SizedBox(width: 12),
+                          CircleAvatar(radius: 18, backgroundColor: Colors.white24, child: Text(avatarInitial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+                        ],
                       ),
                     ],
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(images.length, (index) {
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: _currentIndex == index ? 10 : 6,
-                    height: _currentIndex == index ? 10 : 6,
-                    decoration: BoxDecoration(
-                      color: _currentIndex == index
-                          ? Colors.green
-                          : Colors.grey.shade400,
-                      shape: BoxShape.circle,
-                    ),
-                  );
-                }),
-              ),
-
-              const SizedBox(height: 22),
-
-              _menuCard(0, Icons.camera_alt, Colors.green,
-                  const TranslatedText('Scan Leaf'), const TranslatedText('Upload or Capture image'), () {
-                Navigator.pushNamed(context, '/scan');
-              }),
-              _menuCard(1, Icons.menu_book, Colors.orange,
-                  const TranslatedText('Knowledge Hub'), const TranslatedText('Learn diseases & treatments'), () {
-                Navigator.pushNamed(context, '/knowledge');
-              }),
-
-              _menuCard(2, Icons.smart_toy, Colors.blue,
-                  const TranslatedText('Ask AgroX AI'), const TranslatedText('Instant farming advice'), () {
-                Navigator.pushNamed(context, '/chatbot');
-              }),
-
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-
-      bottomNavigationBar: BottomAppBar(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        elevation: 8,
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 6,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navItem(Icons.home, "Home", 0),
-              const SizedBox(width: 40),
-              _navItem(Icons.person, "Profile", 1),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, int index) {
-    final isSelected = _bottomIndex == index;
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() => _bottomIndex = index);
-
-        if (index == 1) {
-          Navigator.pushNamed(context, '/profile');
-        }
-      },
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon,
-              color: isSelected
-                  ? Colors.green
-                  : (isDark ? Colors.grey : Colors.grey)),
-          const SizedBox(height: 2),
-            TranslatedText(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isSelected ? Colors.green : Colors.grey),
-            ),
-        ],
-      ),
-    );
-  }
-
-    Widget _menuCard(int index, IconData icon, Color color, Widget title,
-      Widget subtitle, VoidCallback onTap) {
-    final isSelected = _selectedIndex == index;
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() => _selectedIndex = index);
-        onTap();
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 14),
-        height: 80,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        transform: isSelected
-            ? (Matrix4.identity()..scale(1.02))
-            : Matrix4.identity(),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? Colors.green.shade700
-                : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        ),
-        child: Row(
-          children: [
-            Container(
-              height: 42,
-              width: 42,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                    DefaultTextStyle.merge(
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: isDark ? Colors.white : Colors.black),
-                      child: title),
-                    const SizedBox(height: 4),
-                    DefaultTextStyle.merge(
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.grey : Colors.grey),
-                      child: subtitle),
                 ],
               ),
             ),
@@ -780,28 +506,159 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 }
 
-class _WeatherItem extends StatelessWidget {
-  final IconData icon;
-  final String? text;
-  final Widget? textWidget;
+/// Big weather card
+class WeatherCard extends StatelessWidget {
+  final Map<String, dynamic>? weather;
+  final bool isLoading;
+  final bool isDark;
+  final String statusText;
+  final Color statusColor;
 
-  const _WeatherItem({required this.icon, this.text, this.textWidget});
+  const WeatherCard({this.weather, required this.isLoading, required this.isDark, required this.statusText, required this.statusColor, super.key});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final double? tempNum = (weather != null && weather!['temp'] != null)
+      ? (weather!['temp'] is num
+        ? (weather!['temp'] as num).toDouble()
+        : double.tryParse(weather!['temp'].toString()))
+      : null;
+    final String temp = tempNum != null ? '${tempNum.toStringAsFixed(1)}°C' : '--';
+    final cond = weather != null ? (weather!['condition'] ?? '') : '--';
+    final int? humidityNum = (weather != null && weather!['humidity'] != null)
+      ? (weather!['humidity'] is num
+        ? (weather!['humidity'] as num).toInt()
+        : int.tryParse(weather!['humidity'].toString()))
+      : null;
+    final String humidity = humidityNum != null ? '${humidityNum}%' : '--';
+    final city = weather != null ? (weather!['city'] ?? '') : '';
 
-    final child = textWidget ?? Text(text ?? '',
-        style: TextStyle(
-            fontSize: 13,
-            color: isDark ? Colors.white : Colors.black));
-
-    return Row(
-      children: [
-        Icon(icon, color: Colors.grey, size: 18),
-        const SizedBox(width: 5),
-        child,
-      ],
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: isDark ? null : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 8))],
+      ),
+      child: isLoading
+          ? SizedBox(height: 100, child: Center(child: CircularProgressIndicator(color: Colors.green.shade700)))
+          : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Row(children: [
+                  const Icon(Icons.location_on, color: Colors.green, size: 18),
+                  const SizedBox(width: 6),
+                  Text(city, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black)),
+                ]),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(12)), child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 12))),
+              ]),
+              const SizedBox(height: 12),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Flexible(child: Text(temp, style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  const SizedBox(width: 12),
+                  Flexible(child: Text(cond, style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[300] : Colors.grey[800]), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Icon(Icons.water_drop, size: 16, color: Colors.blueGrey),
+                  const SizedBox(width: 6),
+                  TranslatedText('Humidity', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700], fontSize: 12)),
+                const SizedBox(width: 6),
+                Text(humidity, style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700], fontSize: 12)),
+                ]),
+              ])
+            ]),
     );
   }
 }
+
+/// Feature card used in the feature row
+class PremiumCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback? onTap;
+  final bool isDark;
+
+  const PremiumCard({required this.icon, required this.title, required this.subtitle, required this.color, this.onTap, this.isDark = false, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 0),
+          constraints: const BoxConstraints(minHeight: 85),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 26),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                TranslatedText(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                const SizedBox(height: 4),
+                TranslatedText(subtitle, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+              ]),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.arrow_forward_ios, size: 16, color: isDark ? Colors.white54 : Colors.grey),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Crop card for Best Fields
+class CropCard extends StatelessWidget {
+  final String label;
+  final String asset;
+  final bool isDark;
+
+  const CropCard({required this.label, required this.asset, required this.isDark, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {},
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 160,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isDark ? null : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+          ),
+          child: Stack(fit: StackFit.expand, children: [
+            Image.asset(asset, fit: BoxFit.cover),
+            Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.black.withOpacity(0.28), Colors.transparent], begin: Alignment.bottomCenter, end: Alignment.topCenter))),
+            Positioned(left: 12, bottom: 12, child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16))),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom navigation bar with center FAB
+// Bottom nav replaced by FloatingBottomNav in this file.
