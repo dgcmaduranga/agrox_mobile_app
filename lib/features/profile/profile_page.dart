@@ -89,188 +89,182 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
 
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
 
-            /// PROFILE CARD (modern compact)
-            Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(top: 10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isDark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          offset: const Offset(0, 2),
-                          blurRadius: 6,
+                  /// PROFILE CARD (modern compact)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(top: 5),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: isDark
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                offset: const Offset(0, 2),
+                                blurRadius: 6,
+                              )
+                            ],
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: Colors.green.shade200,
+                          child: Text(user?.email?[0].toUpperCase() ?? "U",
+                              style: const TextStyle(fontSize: 14)),
+                        ),
+                        const SizedBox(width: 12),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(user?.displayName ?? "User",
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? Colors.white : Colors.black,
+                                  )),
+                              const SizedBox(height: 2),
+                              Text(user?.email ?? "",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? Colors.grey : Colors.black54,
+                                  )),
+                            ],
+                          ),
+                        ),
+
+                        IconButton(
+                          onPressed: _showEditProfileDialog,
+                          icon: Icon(Icons.edit,
+                              size: 18, color: isDark ? Colors.white : Colors.black),
                         )
                       ],
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: Colors.green.shade200,
-                    child: Text(user?.email?[0].toUpperCase() ?? "U",
-                        style: const TextStyle(fontSize: 14)),
+                    ),
                   ),
-                  const SizedBox(width: 12),
 
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 10),
+
+                  _sectionTitle("Account", isDark),
+
+                  _tile(
+                    icon: Icons.person,
+                    titleWidget: const TranslatedText('Edit Profile', style: TextStyle(fontSize:14,fontWeight: FontWeight.w500)),
+                    subtitleWidget: const TranslatedText('Update your details', style: TextStyle(fontSize:11)),
+                    isDark: isDark,
+                    onTap: _showEditProfileDialog,
+                  ),
+
+                  _tile(
+                    icon: Icons.lock,
+                    titleWidget: const TranslatedText('Change Password', style: TextStyle(fontSize:14,fontWeight: FontWeight.w500)),
+                    subtitle: user?.email ?? "",
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordPage()));
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _sectionTitle("Settings", isDark),
+
+                  _switchTile(
+                    icon: Icons.dark_mode,
+                    title: "Dark Mode",
+                    value: isDark,
+                    isDark: isDark,
+                    onChanged: (v) {
+                      themeProvider.toggleTheme(v);
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // =========================
+                  // 🌐 LANGUAGE SECTION
+                  // =========================
+                  _sectionTitle("Language", isDark),
+
+                  _tile(
+                    icon: Icons.language,
+                    title: "Select Language",
+                    subtitle: Provider.of<LanguageProvider>(context).language,
+                    isDark: isDark,
+                    onTap: _showLanguageBottomSheet,
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _sectionTitle("About", isDark),
+
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 5),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF1E1E1E)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
                       children: [
-                        Text(user?.displayName ?? "User",
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : Colors.black,
-                            )),
-                        const SizedBox(height: 2),
-                        Text(user?.email ?? "",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? Colors.grey : Colors.black54,
-                            )),
+                        const Icon(Icons.info,
+                            color: Colors.green, size: 18),
+                        const SizedBox(width: 10),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                                  TranslatedText('AgroX', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
+                                  TranslatedText('Version 1.0.0', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey : Colors.black54)),
+                                  TranslatedText('AI-powered agriculture assistant', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey : Colors.black54)),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
 
-                  IconButton(
-                    onPressed: _showEditProfileDialog,
-                    icon: Icon(Icons.edit,
-                        size: 18, color: isDark ? Colors.white : Colors.black),
-                  )
+                  const SizedBox(height: 10),
                 ],
               ),
             ),
+          ),
 
-            const SizedBox(height: 10),
-
-            _sectionTitle("Account", isDark),
-
-            _tile(
-              icon: Icons.person,
-              titleWidget: const TranslatedText('Edit Profile', style: TextStyle(fontSize:14,fontWeight: FontWeight.w500)),
-              subtitleWidget: const TranslatedText('Update your details', style: TextStyle(fontSize:11)),
-              isDark: isDark,
-              onTap: _showEditProfileDialog,
-            ),
-
-            _tile(
-              icon: Icons.lock,
-              titleWidget: const TranslatedText('Change Password', style: TextStyle(fontSize:14,fontWeight: FontWeight.w500)),
-              subtitle: user?.email ?? "",
-              isDark: isDark,
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordPage()));
-              },
-            ),
-
-            const SizedBox(height: 6),
-
-            _sectionTitle("Settings", isDark),
-
-            _switchTile(
-              icon: Icons.dark_mode,
-              title: "Dark Mode",
-              value: isDark,
-              isDark: isDark,
-              onChanged: (v) {
-                themeProvider.toggleTheme(v);
-              },
-            ),
-
-            _switchTile(
-              icon: Icons.notifications,
-              title: "Notifications",
-              value: _notifications,
-              isDark: isDark,
-              onChanged: (v) {
-                setState(() => _notifications = v);
-              },
-            ),
-
-            // =========================
-            // 🌐 LANGUAGE SECTION
-            // =========================
-            const SizedBox(height: 6),
-            _sectionTitle("Language", isDark),
-
-            _tile(
-              icon: Icons.language,
-              title: "Select Language",
-              subtitle: Provider.of<LanguageProvider>(context).language,
-              isDark: isDark,
-              onTap: _showLanguageBottomSheet,
-            ),
-
-            const SizedBox(height: 4),
-
-            _sectionTitle("About", isDark),
-
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(
-                  vertical: 12, horizontal: 12),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E1E1E)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info,
-                      color: Colors.green, size: 18),
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                            TranslatedText('AgroX', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
-                            TranslatedText('Version 1.0.0', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey : Colors.black54)),
-                            TranslatedText('AI-powered agriculture assistant', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey : Colors.black54)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            /// LOGOUT
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(30),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 14),
+          // Persistent Logout button
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: GestureDetector(
+              onTap: _showLogoutConfirmation,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                onPressed: () async {
-                  await FirebaseAuth.instance.signOut();
-                  Navigator.pushReplacementNamed(
-                      context, '/login');
-                },
-                child: const TranslatedText('Logout', style: TextStyle(color: Colors.white, fontSize: 14)),
+                child: const Center(
+                  child: Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
               ),
             ),
-
-            const SizedBox(height: 12),
-          ],
-        ),
+          ),
+        ],
       ),
 
       bottomNavigationBar: BottomAppBar(
@@ -403,6 +397,39 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // Logout confirmation with blur background
+  Future<void> _showLogoutConfirmation() async {
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+    return showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (ctx) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text('Confirm Logout', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+            content: Text('Are you sure you want to logout?', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87)),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
+                  Navigator.pop(ctx);
+                  Navigator.pushReplacementNamed(context, '/login');
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Logout'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   ////////////////////////////////////////////////////////////
 
   Widget _tile({
@@ -417,17 +444,17 @@ class _ProfilePageState extends State<ProfilePage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin:
-            const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(
-            vertical: 12, horizontal: 12),
-        decoration: BoxDecoration(
-          color: isDark
-              ? const Color(0xFF1E1E1E)
-              : Colors.white,
-          borderRadius:
-              BorderRadius.circular(16),
-        ),
+      margin:
+        const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.symmetric(
+        vertical: 12, horizontal: 12),
+      decoration: BoxDecoration(
+        color: isDark
+          ? const Color(0xFF1E1E1E)
+          : Colors.white,
+        borderRadius:
+          BorderRadius.circular(16),
+      ),
         child: Row(
           children: [
             Icon(icon,
@@ -472,9 +499,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }) {
     return Container(
       margin:
-          const EdgeInsets.only(bottom: 10),
+        const EdgeInsets.only(bottom: 5),
       padding: const EdgeInsets.symmetric(
-          vertical: 12, horizontal: 12),
+        vertical: 12, horizontal: 12),
       decoration: BoxDecoration(
         color: isDark
             ? const Color(0xFF1E1E1E)

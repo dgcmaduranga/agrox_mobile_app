@@ -271,8 +271,8 @@
       "Proper spacing"
     ],
     "riskConditions": {
-      "minTemp": 25,
-      "maxTemp": 32,
+      "minTemp": 24,
+      "maxTemp": 30,
       "minHumidity": 75,
       "rainRequired": true
     }

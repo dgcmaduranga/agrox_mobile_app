@@ -15,6 +15,17 @@ class WeatherService {
       // ignore: avoid_print
       print('WeatherService: raw response (${response.statusCode}) -> ${response.body}');
 
+      // Additional explicit debug lines to match backend logs
+      try {
+        final data = json.decode(response.body);
+        // ignore: avoid_print
+        print('API RESPONSE: $data');
+        // ignore: avoid_print
+        print('HUMIDITY FROM API: ${data['main']?['humidity']}');
+        // ignore: avoid_print
+        print('LOCATION: ${data['name']}');
+      } catch (_) {}
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
 
