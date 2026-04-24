@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
@@ -19,11 +20,24 @@ import 'features/knowledge/knowledge_page.dart';
 
 // ✅ AI Pages
 import 'features/home/detect_page.dart';
-import 'features/home/chat_page.dart'; // 🔥 ADD THIS
+import 'features/home/chat_page.dart';
 
 // Theme
 import 'services/theme_provider.dart';
 import 'services/language_provider.dart';
+
+// ✅ Notifications
+import 'services/notification_service.dart';
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Background message received
+  print('Background notification received: ${message.messageId}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +45,12 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // ✅ Background Firebase notification handler
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // ✅ Initialize notification service
+  await NotificationService.instance.init();
 
   runApp(
     MultiProvider(
@@ -49,6 +69,7 @@ class AgroXApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+
     // Listen to language provider so app rebuilds when language changes.
     Provider.of<LanguageProvider>(context);
 
@@ -103,9 +124,7 @@ class AgroXApp extends StatelessWidget {
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         primaryColor: Colors.green,
-        // Global scaffold background: neutral deep gray/black
         scaffoldBackgroundColor: const Color(0xFF0B0F14),
-        // Use explicit dark color scheme to avoid material blue tint
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF22C55E),
           background: Color(0xFF0B0F14),
@@ -121,7 +140,6 @@ class AgroXApp extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        // Card / container surfaces
         cardColor: const Color(0xFF161B22),
         useMaterial3: true,
       ),
@@ -142,10 +160,10 @@ class AgroXApp extends StatelessWidget {
         '/knowledge': (context) => const KnowledgePage(),
 
         // 🤖 AI Scan Page
-        '/scan': (context) => DetectPage(),
+        '/scan': (context) => const DetectPage(),
 
-        // 🤖 CHATBOT (NEW 🔥🔥🔥)
-        '/chatbot': (context) => const ChatPage(), // ✅ THIS FIXES YOUR ERROR
+        // 🤖 CHATBOT
+        '/chatbot': (context) => const ChatPage(),
       },
     );
   }
@@ -187,7 +205,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SplashPage();
         }

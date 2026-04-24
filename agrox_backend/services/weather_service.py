@@ -35,19 +35,69 @@ def get_weather(lat, lon):
 
         main = raw.get("main", {})
         weather_list = raw.get("weather", [])
+        wind = raw.get("wind", {})
+        sys = raw.get("sys", {})
+        clouds = raw.get("clouds", {})
 
-        temp = float(main.get("temp")) if main.get("temp") else None
-        humidity = int(main.get("humidity")) if main.get("humidity") else None
+        # normalize numeric fields with safe fallbacks
+        def to_float(v):
+            try:
+                return float(v) if v is not None else None
+            except Exception:
+                return None
+
+        def to_int(v):
+            try:
+                return int(v) if v is not None else None
+            except Exception:
+                return None
+
+        temp = to_float(main.get("temp"))
+        temp_max = to_float(main.get("temp_max"))
+        temp_min = to_float(main.get("temp_min"))
+        humidity = to_int(main.get("humidity"))
+        pressure = to_int(main.get("pressure"))
+
+        wind_speed = to_float(wind.get("speed")) if wind.get("speed") is not None else 0.0
 
         condition = None
+        description = None
+        icon = None
         if weather_list:
-            condition = weather_list[0].get("main")
+            first = weather_list[0]
+            condition = first.get("main")
+            description = first.get("description")
+            icon = first.get("icon")
 
-        # ❌ REMOVE CITY FROM HERE
+        # safe rain fallback (1h preferred, then 3h, else 0)
+        rain = 0.0
+        try:
+            rain = float(raw.get("rain", {}).get("1h", raw.get("rain", {}).get("3h", 0.0)))
+        except Exception:
+            rain = 0.0
+
+        cloud_pct = to_int(clouds.get("all")) or 0
+
+        sunrise = sys.get("sunrise")
+        sunset = sys.get("sunset")
+
+        city_name = raw.get("name") or "Nearby"
+
         clean = {
+            "location": city_name,
             "temp": temp,
+            "temp_max": temp_max,
+            "temp_min": temp_min,
             "humidity": humidity,
+            "pressure": pressure,
+            "wind_speed": wind_speed,
             "condition": condition,
+            "description": description,
+            "clouds": cloud_pct,
+            "sunrise": int(sunrise) if sunrise is not None else None,
+            "sunset": int(sunset) if sunset is not None else None,
+            "rain": rain,
+            "icon": icon,
         }
 
         print(f"weather_service: clean -> {clean}")

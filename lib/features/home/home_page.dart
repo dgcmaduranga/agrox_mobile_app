@@ -11,16 +11,13 @@ import '../../services/api_service.dart';
 import '../../services/weather_service.dart';
 import '../../services/location_service.dart';
 import '../../services/risk_service.dart';
+import '../../services/notification_service.dart';
 import '../../models/disease_model.dart';
 import '../../services/theme_provider.dart';
 import '../../services/language_provider.dart';
 import '../../widgests/translated_text.dart';
 import '../../widgests/floating_bottom_nav.dart';
 import 'notification_page.dart';
-// NOTE: TranslatedText (existing app widget) is used for translations on this page.
-
-// NOTE: Translations are provided at runtime by TranslationService.
-// UI source strings MUST be plain English. Use `TText` to render translated text.
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -29,8 +26,105 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+// Language selector circular button
+Widget _buildLanguageSwitcher(BuildContext context, bool isDark) {
+  final lang = Provider.of<LanguageProvider>(context);
+  final display = lang.language.toUpperCase();
+
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(42),
+      onTap: () => _showLanguageSelector(context),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(0.18),
+          border: Border.all(color: Colors.white.withOpacity(0.15)),
+        ),
+        child: Text(
+          display,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// Language selector bottom sheet
+void _showLanguageSelector(BuildContext context) {
+  final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+    ),
+    backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+    builder: (ctx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                height: 4,
+                width: 48,
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[800] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              _languageOption(context, 'English', 'en'),
+              _languageOption(context, 'සිංහල', 'si'),
+              _languageOption(context, 'தமிழ்', 'ta'),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Widget _languageOption(BuildContext context, String label, String code) {
+  final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+  final provider = Provider.of<LanguageProvider>(context);
+
+  return ListTile(
+    title: Text(
+      label,
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: isDark ? Colors.white : Colors.black,
+      ),
+    ),
+    onTap: () {
+      final providerWrite =
+          Provider.of<LanguageProvider>(context, listen: false);
+      providerWrite.setLanguage(code);
+      Navigator.pop(context);
+    },
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+    trailing: provider.language == code
+        ? const Icon(Icons.check, color: Colors.green)
+        : null,
+    tileColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+  );
+}
+
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  // Debug coords (optional)
   static const bool _forceDebugCoords = false;
   static const double _debugLat = 5.9485;
   static const double _debugLon = 80.5353;
@@ -45,11 +139,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Timer? _refreshTimer;
   int _bottomIndex = 0;
-  int _selectedFeature = -1;
-  bool _isFabPressed = false;
-  String? _selectedCrop;
 
-  // Crops list
+  // notification duplicate avoid
+  String? _lastNotificationKey;
+
   final List<Map<String, String>> crops = [
     {'key': 'coconut', 'label': 'Coconut', 'asset': 'assets/images/coconut.png'},
     {'key': 'tea', 'label': 'Tea', 'asset': 'assets/images/tea.png'},
@@ -61,6 +154,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadAll();
+
     _refreshTimer = Timer.periodic(const Duration(minutes: 10), (_) {
       if (mounted) _loadAll();
     });
@@ -87,6 +181,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
 
     final loc = await LocationService.getCurrentLocation();
+
     if (loc == null) {
       setState(() {
         isLoading = false;
@@ -96,11 +191,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       });
       return;
     }
+
     double lat = loc['lat'] as double;
     double lon = loc['lon'] as double;
 
     if (_forceDebugCoords) {
-      // ignore: avoid_print
       print('HomePage: DEBUG forcing coords to $_debugLat,$_debugLon');
       lat = _debugLat;
       lon = _debugLon;
@@ -108,31 +203,62 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     try {
       final weatherSvc = WeatherService();
-      // ignore: avoid_print
+
       print('HomePage: fetching weather for lat=$lat, lon=$lon');
       final w = await weatherSvc.getWeather(lat, lon);
 
-      // prefer LocationService city if available
       final cityName = (loc['city'] as String?) ?? '';
 
       final dynamic rawTemp = w?['temp'];
-      final double? tempVar = rawTemp is num ? (rawTemp as num).toDouble() : (rawTemp is String ? double.tryParse(rawTemp) : null);
-      final int? humidityVar = (w != null && w['humidity'] != null) ? (w['humidity'] is num ? (w['humidity'] as num).toInt() : int.tryParse(w['humidity'].toString()) ?? null) : null;
+      final double? tempVar = rawTemp is num
+          ? rawTemp.toDouble()
+          : rawTemp is String
+              ? double.tryParse(rawTemp)
+              : null;
+
+      final int? humidityVar = w != null && w['humidity'] != null
+          ? w['humidity'] is num
+              ? (w['humidity'] as num).toInt()
+              : int.tryParse(w['humidity'].toString())
+          : null;
 
       final diseases = await fetchDiseases();
 
-      final bool hasRain = (w != null && (w['raw'] != null) && ((w['raw']['rain'] != null) || (w['raw']['weather'] != null && (w['raw']['weather'] as List).any((it) => (it['main']?.toString().toLowerCase() ?? '').contains('rain')))));
+      final bool hasRain = w != null &&
+          w['raw'] != null &&
+          (w['raw']['rain'] != null ||
+              (w['raw']['weather'] != null &&
+                  (w['raw']['weather'] as List).any(
+                    (it) => (it['main']?.toString().toLowerCase() ?? '')
+                        .contains('rain'),
+                  )));
 
-      final cropKeys = crops.map((c) => (c['key'] ?? '').toString().toLowerCase()).where((s) => s.isNotEmpty).toList();
-      final scored = RiskService.selectTopPerCrop(diseases, tempVar, humidityVar, hasRain, cropOrder: cropKeys, limit: 3);
+      final cropKeys = crops
+          .map((c) => (c['key'] ?? '').toString().toLowerCase())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      final scored = RiskService.selectTopPerCrop(
+        diseases,
+        tempVar,
+        humidityVar,
+        hasRain,
+        cropOrder: cropKeys,
+        limit: 3,
+      );
 
       setState(() {
         weather = {
           ...?w,
           'temp': tempVar,
           'humidity': humidityVar,
-          'city': (cityName.isNotEmpty) ? cityName : (w != null && (w['city']?.toString().isNotEmpty ?? false) ? w['city'] : 'Nearby'),
+          'city': cityName.isNotEmpty
+              ? cityName
+              : w != null && (w['city']?.toString().isNotEmpty ?? false)
+                  ? w['city']
+                  : 'Nearby',
         };
+
         riskList = scored.map((d) => d.toJson()).toList();
         isLoading = false;
       });
@@ -152,12 +278,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     try {
       final uri = Uri.parse('${ApiService.baseUrl}/diseases');
       final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
+
         if (data is List) {
-          return data.map((e) => Disease.fromJson(e as Map<String, dynamic>)).toList();
+          return data
+              .map((e) => Disease.fromJson(e as Map<String, dynamic>))
+              .toList();
         }
       }
+
       return [];
     } catch (e) {
       return [];
@@ -175,63 +306,175 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
 
     int highCount = 0;
+    int mediumCount = 0;
+
     for (var d in riskList) {
       final severity = (d['severity'] ?? '').toString().toLowerCase();
-      if (severity.contains('high') || severity.contains('severe')) highCount++;
+
+      if (severity.contains('high') || severity.contains('severe')) {
+        highCount++;
+      } else if (severity.contains('medium')) {
+        mediumCount++;
+      }
+    }
+
+    String newRiskText;
+    Color newRiskColor;
+    IconData newRiskIcon;
+
+    if (highCount > 0) {
+      newRiskText = "High disease risk";
+      newRiskColor = Colors.red;
+      newRiskIcon = Icons.warning;
+    } else if (mediumCount > 0) {
+      newRiskText = "Medium disease risk";
+      newRiskColor = Colors.orange;
+      newRiskIcon = Icons.warning_amber_rounded;
+    } else {
+      newRiskText = "Low Risk";
+      newRiskColor = Colors.green;
+      newRiskIcon = Icons.check_circle;
     }
 
     setState(() {
-      if (highCount >= 3 || riskList.length >= 5) {
-        riskText = "High disease risk";
-        riskColor = Colors.red;
-        riskIcon = Icons.warning;
-      } else if (highCount > 0) {
-        riskText = "Medium disease risk";
-        riskColor = Colors.orange;
-        riskIcon = Icons.warning_amber_rounded;
-      } else {
-        riskText = "Low Risk";
-        riskColor = Colors.green;
-        riskIcon = Icons.check_circle;
-      }
+      riskText = newRiskText;
+      riskColor = newRiskColor;
+      riskIcon = newRiskIcon;
     });
+
+    _sendRiskNotificationIfNeeded(newRiskText);
+  }
+
+  Future<void> _sendRiskNotificationIfNeeded(String levelText) async {
+    try {
+      final lowerLevel = levelText.toLowerCase();
+
+      if (!lowerLevel.contains('high') && !lowerLevel.contains('medium')) {
+        return;
+      }
+
+      if (riskList.isEmpty) return;
+
+      Map<String, dynamic>? selectedRisk;
+
+      for (final item in riskList) {
+        final map = Map<String, dynamic>.from(item as Map);
+        final severity = (map['severity'] ?? '').toString().toLowerCase();
+
+        if (lowerLevel.contains('high') &&
+            (severity.contains('high') || severity.contains('severe'))) {
+          selectedRisk = map;
+          break;
+        }
+
+        if (lowerLevel.contains('medium') && severity.contains('medium')) {
+          selectedRisk = map;
+          break;
+        }
+      }
+
+      selectedRisk ??= Map<String, dynamic>.from(riskList.first as Map);
+
+      final crop = (selectedRisk['crop'] ??
+              selectedRisk['crop_type'] ??
+              selectedRisk['plant'] ??
+              selectedRisk['category'] ??
+              'Crop')
+          .toString();
+
+      final diseaseName = (selectedRisk['name'] ??
+              selectedRisk['disease'] ??
+              selectedRisk['title'] ??
+              selectedRisk['disease_name'] ??
+              'Disease risk')
+          .toString();
+
+      final severity = (selectedRisk['severity'] ?? levelText).toString();
+
+      final notificationKey =
+          '${DateTime.now().day}-$crop-$diseaseName-$severity-$levelText';
+
+      if (_lastNotificationKey == notificationKey) {
+        return;
+      }
+
+      _lastNotificationKey = notificationKey;
+
+      await NotificationService.instance.showRiskNotification(
+        crop: crop,
+        diseaseName: diseaseName,
+        riskLevel: levelText,
+        severity: severity,
+      );
+    } catch (e) {
+      print('Risk notification error: $e');
+    }
   }
 
   bool get _showRiskDot {
     try {
-      return riskList.isNotEmpty && (riskList.take(3).any((d) => (d['score'] ?? 0) > 0));
+      return riskList.isNotEmpty &&
+          riskList.take(3).any((d) => (d['score'] ?? 0) > 0);
     } catch (_) {
       return false;
     }
   }
 
   void _showRiskModal() {
-    final topMaps = (riskList.isNotEmpty) ? riskList.take(3).toList() : [];
+    final topMaps = riskList.isNotEmpty ? riskList.take(3).toList() : [];
+
     final topDiseases = topMaps.map((m) {
       final Map<String, dynamic> map = Map<String, dynamic>.from(m as Map);
       final d = Disease.fromJson(map);
-      if (map['score'] != null) d.score = (map['score'] is num) ? (map['score'] as num).toInt() : int.tryParse(map['score'].toString()) ?? 0;
-      if (map['percent'] != null) d.percent = (map['percent'] is num) ? (map['percent'] as num).toDouble() : double.tryParse(map['percent']?.toString() ?? '') ?? 0.0;
-      if (map['severity'] != null) d.severity = map['severity'].toString();
+
+      if (map['score'] != null) {
+        d.score = map['score'] is num
+            ? (map['score'] as num).toInt()
+            : int.tryParse(map['score'].toString()) ?? 0;
+      }
+
+      if (map['percent'] != null) {
+        d.percent = map['percent'] is num
+            ? (map['percent'] as num).toDouble()
+            : double.tryParse(map['percent']?.toString() ?? '') ?? 0.0;
+      }
+
+      if (map['severity'] != null) {
+        d.severity = map['severity'].toString();
+      }
+
       return d;
     }).toList();
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (ctx) => NotificationPage(diseases: topDiseases)),
+      MaterialPageRoute(
+        builder: (ctx) => NotificationPage(diseases: topDiseases),
+      ),
     );
   }
 
   String _formatDate(DateTime dt) {
-    final weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dt.weekday % 7];
+    final weekday = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ][dt.weekday % 7];
+
     final day = dt.day.toString().padLeft(2, '0');
     final month = dt.month.toString().padLeft(2, '0');
     final year = dt.year.toString();
+
     return '$weekday, $day/$month/$year';
   }
 
   String _greeting() {
     final hour = DateTime.now().hour;
+
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
@@ -241,15 +484,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final theme = Provider.of<ThemeProvider>(context);
-    final langProvider = Provider.of<LanguageProvider>(context);
     final isDark = theme.isDark;
     final mq = MediaQuery.of(context);
     final double padding = 16.0;
 
+    final String userName = user?.displayName ?? user?.email ?? '';
+    final String avatarInitial =
+        userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
+
+    final String greetingStr = _greeting();
+    final String dateStr = _formatDate(DateTime.now());
+
     return Scaffold(
       extendBody: true,
       resizeToAvoidBottomInset: false,
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF6F7F9),
+      backgroundColor:
+          isDark ? const Color(0xFF121212) : const Color(0xFFF6F7F9),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -259,29 +509,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: IntrinsicHeight(
               child: Column(
                 children: [
-                  // Header with floating weather card (full-width)
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: HeaderWidget(
-                          greeting: _greeting(),
-                          userName: user?.displayName ?? 'User',
-                          date: _formatDate(DateTime.now()),
-                          showRiskDot: _showRiskDot,
-                          onBellTap: _showRiskModal,
-                          isDark: isDark,
-                          avatarInitial: (user?.email?.isNotEmpty == true) ? user!.email![0].toUpperCase() : 'U',
-                        ),
+                      HeaderWidget(
+                        greeting: greetingStr,
+                        userName: userName,
+                        date: dateStr,
+                        showRiskDot: _showRiskDot,
+                        onBellTap: _showRiskModal,
+                        isDark: isDark,
+                        avatarInitial: avatarInitial,
                       ),
-
                       Positioned(
                         top: 120,
-                        left: padding,
-                        right: padding,
-                        child: Transform.translate(
-                          offset: const Offset(0, -20),
+                        left: 0,
+                        right: 0,
+                        child: Center(
                           child: WeatherCard(
                             weather: weather,
                             isLoading: isLoading,
@@ -294,7 +538,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ],
                   ),
 
-                  const SizedBox(height: 120),
+                  const SizedBox(height: 115),
 
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: padding),
@@ -308,22 +552,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           onTap: () => Navigator.pushNamed(context, '/scan'),
                           isDark: isDark,
                         ),
+
                         const SizedBox(height: 12),
+
                         PremiumCard(
                           icon: Icons.menu_book,
                           title: 'Knowledge Hub',
                           subtitle: 'Learn diseases & treatments',
                           color: Colors.orange,
-                          onTap: () => Navigator.pushNamed(context, '/knowledge'),
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/knowledge'),
                           isDark: isDark,
                         ),
+
                         const SizedBox(height: 12),
+
                         PremiumCard(
                           icon: Icons.smart_toy,
                           title: 'Ask AgroX AI',
                           subtitle: 'Instant farming advice',
                           color: Colors.blue,
-                          onTap: () => Navigator.pushNamed(context, '/chatbot'),
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/chatbot'),
                           isDark: isDark,
                         ),
 
@@ -332,21 +582,43 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            TranslatedText('Best Fields', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black)),
-                            TextButton(onPressed: () {}, child: TranslatedText('See All', style: TextStyle(color: Colors.green.shade700))),
+                            TranslatedText(
+                              'Best Fields',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {},
+                              child: TranslatedText(
+                                'See All',
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
 
                         const SizedBox(height: 8),
+
                         SizedBox(
                           height: 120,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: crops.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 12),
                             itemBuilder: (context, i) {
                               final c = crops[i];
-                              return CropCard(label: c['label']!, asset: c['asset']!, isDark: isDark);
+
+                              return CropCard(
+                                label: c['label']!,
+                                asset: c['asset']!,
+                                isDark: isDark,
+                              );
                             },
                           ),
                         ),
@@ -379,20 +651,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 }
 
-
-/// Header widget with green gradient curved background, greeting, date, avatar and bell.
+// ===============================
+// HEADER CLIPPER
+// ===============================
 class CustomHeaderClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
-    Path path = Path();
+    final Path path = Path();
 
-    path.lineTo(0, size.height - 40);
+    path.lineTo(0, size.height - 5);
 
     path.quadraticBezierTo(
       size.width / 2,
-      size.height + 40,
+      size.height + 95,
       size.width,
-      size.height - 40,
+      size.height - 5,
     );
 
     path.lineTo(size.width, 0);
@@ -405,6 +678,9 @@ class CustomHeaderClipper extends CustomClipper<Path> {
   bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
 
+// ===============================
+// HEADER WIDGET
+// ===============================
 class HeaderWidget extends StatelessWidget {
   final String greeting;
   final String userName;
@@ -427,76 +703,166 @@ class HeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const height = 150.0;
+    const height = 185.0;
+
     return ClipPath(
       clipper: CustomHeaderClipper(),
       child: Container(
         height: height,
         decoration: BoxDecoration(
-          borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(35), bottomRight: Radius.circular(35)),
-          image: const DecorationImage(
-            image: AssetImage('assets/images/home.png'),
-            fit: BoxFit.cover,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color.fromARGB(255, 76, 175, 80),
+              Color.fromARGB(255, 102, 187, 106),
+            ],
           ),
-          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 12, offset: const Offset(0, 6))],
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(30),
+            bottomRight: Radius.circular(30),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Stack(
           children: [
-            // dark overlay + slight blur to improve readability
-            Positioned.fill(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 2.0, sigmaY: 2.0),
+            if (isDark)
+              Positioned.fill(
                 child: Container(
-                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.32), borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(35), bottomRight: Radius.circular(35))),
+                  decoration: const BoxDecoration(
+                    color: Color.fromRGBO(0, 0, 0, 0.22),
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(30),
+                      bottomRight: Radius.circular(30),
+                    ),
+                  ),
                 ),
               ),
-            ),
+
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 30, 16, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      // greeting (English source) + capitalize username
-                      Builder(builder: (ctx) {
-                        String name = userName.trim();
-                        if (name.isNotEmpty) {
-                          final parts = name.split(' ');
-                          name = parts.map((p) => p.isEmpty ? p : (p[0].toUpperCase() + p.substring(1))).join(' ');
-                        }
-                        // Use TranslatedText for the greeting phrase and append the name as plain text
-                        return Row(children: [
-                          TranslatedText('${greeting}, ', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                          Text('${name.isNotEmpty ? name : 'User'} 👋', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                        ]);
-                      }),
-                      const SizedBox(height: 6),
-                      Text(date, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                    ]),
-                  ),
-                  Column(
-                    children: [
-                      Row(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          GestureDetector(
-                            onTap: onBellTap,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                const Icon(Icons.notifications_none, color: Colors.white, size: 26),
-                                if (showRiskDot)
-                                  Positioned(top: -4, right: -4, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 2)]))),
-                              ],
+                          Builder(
+                            builder: (ctx) {
+                              String name = userName.trim();
+
+                              if (name.isNotEmpty) {
+                                final parts = name.split(' ');
+                                name = parts
+                                    .map(
+                                      (p) => p.isEmpty
+                                          ? p
+                                          : p[0].toUpperCase() + p.substring(1),
+                                    )
+                                    .join(' ');
+                              }
+
+                              return Row(
+                                children: [
+                                  TranslatedText(
+                                    '$greeting, ',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      '${name.isNotEmpty ? name : 'User'} 👋',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          Text(
+                            date,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          CircleAvatar(radius: 18, backgroundColor: Colors.white24, child: Text(avatarInitial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
                         ],
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: onBellTap,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              const Icon(
+                                Icons.notifications_none,
+                                color: Colors.white,
+                                size: 26,
+                              ),
+
+                              if (showRiskDot)
+                                Positioned(
+                                  top: -4,
+                                  right: -4,
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black26,
+                                          blurRadius: 2,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(width: 10),
+
+                        _buildLanguageSwitcher(context, isDark),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -506,7 +872,9 @@ class HeaderWidget extends StatelessWidget {
   }
 }
 
-/// Big weather card
+// ===============================
+// WEATHER CARD WITHOUT SUNRISE / SUNSET
+// ===============================
 class WeatherCard extends StatelessWidget {
   final Map<String, dynamic>? weather;
   final bool isLoading;
@@ -514,65 +882,273 @@ class WeatherCard extends StatelessWidget {
   final String statusText;
   final Color statusColor;
 
-  const WeatherCard({this.weather, required this.isLoading, required this.isDark, required this.statusText, required this.statusColor, super.key});
+  const WeatherCard({
+    this.weather,
+    required this.isLoading,
+    required this.isDark,
+    required this.statusText,
+    required this.statusColor,
+    super.key,
+  });
+
+  String _emojiForCondition(String? cond) {
+    if (cond == null) return '🌤';
+
+    final c = cond.toLowerCase();
+
+    if (c.contains('rain') || c.contains('drizzle')) return '🌧';
+    if (c.contains('cloud')) return '☁️';
+    if (c.contains('clear') || c.contains('sun')) return '☀️';
+    if (c.contains('snow')) return '❄️';
+    if (c.contains('thunder') || c.contains('storm')) return '🌩';
+
+    return '🌤';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final double? tempNum = (weather != null && weather!['temp'] != null)
-      ? (weather!['temp'] is num
-        ? (weather!['temp'] as num).toDouble()
-        : double.tryParse(weather!['temp'].toString()))
-      : null;
-    final String temp = tempNum != null ? '${tempNum.toStringAsFixed(1)}°C' : '--';
-    final cond = weather != null ? (weather!['condition'] ?? '') : '--';
-    final int? humidityNum = (weather != null && weather!['humidity'] != null)
-      ? (weather!['humidity'] is num
-        ? (weather!['humidity'] as num).toInt()
-        : int.tryParse(weather!['humidity'].toString()))
-      : null;
-    final String humidity = humidityNum != null ? '${humidityNum}%' : '--';
-    final city = weather != null ? (weather!['city'] ?? '') : '';
+    if (isLoading) {
+      return Container(
+        width: MediaQuery.of(context).size.width * 0.94,
+        height: 150,
+        margin: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black12.withOpacity(0.10),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+        ),
+        child: Center(
+          child: CircularProgressIndicator(color: Colors.green.shade700),
+        ),
+      );
+    }
+
+    final loc = weather != null
+        ? (weather!['location'] ?? weather!['city'] ?? 'Nearby')
+        : 'Nearby';
+
+    final double tempNum = weather != null && weather!['temp'] != null
+        ? weather!['temp'] is num
+            ? (weather!['temp'] as num).toDouble()
+            : double.tryParse(weather!['temp'].toString()) ?? 0.0
+        : 0.0;
+
+    final int humidity = weather != null && weather!['humidity'] != null
+        ? weather!['humidity'] is num
+            ? (weather!['humidity'] as num).toInt()
+            : int.tryParse(weather!['humidity'].toString()) ?? 0
+        : 0;
+
+    final int pressure = weather != null && weather!['pressure'] != null
+        ? weather!['pressure'] is num
+            ? (weather!['pressure'] as num).toInt()
+            : int.tryParse(weather!['pressure'].toString()) ?? 0
+        : 0;
+
+    final double wind = weather != null && weather!['wind_speed'] != null
+        ? weather!['wind_speed'] is num
+            ? (weather!['wind_speed'] as num).toDouble()
+            : double.tryParse(weather!['wind_speed'].toString()) ?? 0.0
+        : 0.0;
+
+    final String condition = weather != null
+        ? (weather!['condition']?.toString() ??
+            weather!['description']?.toString() ??
+            '')
+        : '';
+
+    final tempStr = '${tempNum.toStringAsFixed(1)}°C';
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      width: MediaQuery.of(context).size.width * 0.94,
+      height: 150,
+      margin: const EdgeInsets.symmetric(horizontal: 18),
+      clipBehavior: Clip.hardEdge,
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: isDark ? null : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 8))],
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
-      child: isLoading
-          ? SizedBox(height: 100, child: Center(child: CircularProgressIndicator(color: Colors.green.shade700)))
-          : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Row(children: [
-                  const Icon(Icons.location_on, color: Colors.green, size: 18),
-                  const SizedBox(width: 6),
-                  Text(city, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black)),
-                ]),
-                Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(12)), child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 12))),
-              ]),
-              const SizedBox(height: 12),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Flexible(child: Text(temp, style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  const SizedBox(width: 12),
-                  Flexible(child: Text(cond, style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[300] : Colors.grey[800]), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                ]),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Icon(Icons.water_drop, size: 16, color: Colors.blueGrey),
-                  const SizedBox(width: 6),
-                  TranslatedText('Humidity', style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700], fontSize: 12)),
-                const SizedBox(width: 6),
-                Text(humidity, style: TextStyle(color: isDark ? Colors.grey[300] : Colors.grey[700], fontSize: 12)),
-                ]),
-              ])
-            ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Location + Risk
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Icon(Icons.location_on, color: Colors.green, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  loc.toString(),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          // Temperature + Condition
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  tempStr,
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
+                ),
+              ),
+              Transform.translate(
+                offset: const Offset(0, -4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _emojiForCondition(condition),
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(height: 2),
+                    TranslatedText(
+                      condition.isNotEmpty ? condition : 'Unknown',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const Spacer(),
+
+          // Humidity / Pressure / Wind
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _WeatherStat(
+                label: 'Humidity',
+                value: '$humidity%',
+                isDark: isDark,
+              ),
+              _WeatherStat(
+                label: 'Pressure',
+                value: '$pressure hPa',
+                isDark: isDark,
+                alignCenter: true,
+              ),
+              _WeatherStat(
+                label: 'Wind',
+                value: '${wind.toStringAsFixed(1)} m/s',
+                isDark: isDark,
+                alignRight: true,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Feature card used in the feature row
+class _WeatherStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isDark;
+  final bool alignCenter;
+  final bool alignRight;
+
+  const _WeatherStat({
+    required this.label,
+    required this.value,
+    required this.isDark,
+    this.alignCenter = false,
+    this.alignRight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    CrossAxisAlignment align = CrossAxisAlignment.start;
+
+    if (alignCenter) align = CrossAxisAlignment.center;
+    if (alignRight) align = CrossAxisAlignment.end;
+
+    return Column(
+      crossAxisAlignment: align,
+      children: [
+        TranslatedText(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark ? Colors.white54 : Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : Colors.black,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ===============================
+// PREMIUM FEATURE CARD
+// ===============================
 class PremiumCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -581,7 +1157,15 @@ class PremiumCard extends StatelessWidget {
   final VoidCallback? onTap;
   final bool isDark;
 
-  const PremiumCard({required this.icon, required this.title, required this.subtitle, required this.color, this.onTap, this.isDark = false, super.key});
+  const PremiumCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    this.onTap,
+    this.isDark = false,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -599,42 +1183,77 @@ class PremiumCard extends StatelessWidget {
             color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 6),
+              ),
             ],
           ),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
-                borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF2C2C2E)
+                      : const Color(0xFFF2F2F7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 26),
               ),
-              child: Icon(icon, color: color, size: 26),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                TranslatedText(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                const SizedBox(height: 4),
-                TranslatedText(subtitle, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
-              ]),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.arrow_forward_ios, size: 16, color: isDark ? Colors.white54 : Colors.grey),
-          ]),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TranslatedText(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    TranslatedText(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: isDark ? Colors.white54 : Colors.grey,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Crop card for Best Fields
+// ===============================
+// CROP CARD
+// ===============================
 class CropCard extends StatelessWidget {
   final String label;
   final String asset;
   final bool isDark;
 
-  const CropCard({required this.label, required this.asset, required this.isDark, super.key});
+  const CropCard({
+    required this.label,
+    required this.asset,
+    required this.isDark,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -647,18 +1266,47 @@ class CropCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: isDark ? null : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                    ),
+                  ],
           ),
-          child: Stack(fit: StackFit.expand, children: [
-            Image.asset(asset, fit: BoxFit.cover),
-            Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [Colors.black.withOpacity(0.28), Colors.transparent], begin: Alignment.bottomCenter, end: Alignment.topCenter))),
-            Positioned(left: 12, bottom: 12, child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16))),
-          ]),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(asset, fit: BoxFit.cover),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.black.withOpacity(0.28),
+                      Colors.transparent,
+                    ],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 12,
+                bottom: 12,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-
-/// Bottom navigation bar with center FAB
-// Bottom nav replaced by FloatingBottomNav in this file.

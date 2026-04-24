@@ -13,6 +13,9 @@
     <!-- 📁 STORAGE (for image upload - optional but safe) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
 
+    <!-- 🔔 NOTIFICATIONS for Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
         android:label="AgroX"
         android:name="${applicationName}"
@@ -40,6 +43,20 @@
             </intent-filter>
 
         </activity>
+
+        <!-- 🔔 Firebase Cloud Messaging Service -->
+        <service
+            android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+
+        <!-- 🔔 Default notification channel id -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="agrox_high_importance_channel" />
 
         <!-- 🔥 Flutter embedding -->
         <meta-data

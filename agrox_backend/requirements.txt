@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+numpy
+tensorflow
+opencv-python
+scikit-learn
+joblib
+scipy
+requests
+python-dotenv
+openai
+firebase-admin
+pydantic

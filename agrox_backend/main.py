@@ -6,11 +6,11 @@ import traceback
 
 from services.weather_service import get_weather
 from services.ai_service import predict
-
 from services.chatbot_service import ask_chatbot
-from pydantic import BaseModel
-
 from services.translate_service import translate_text
+from services.notification_service import send_risk_alert_notification
+
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -191,4 +191,39 @@ def chat(req: ChatRequest):
         print("CHAT ERROR:", e)
         return {
             "response": "Chatbot temporarily unavailable"
+        }
+
+# =========================
+# 🔔 NOTIFICATION MODEL
+# =========================
+class RiskNotificationRequest(BaseModel):
+    token: str
+    crop: str
+    disease_name: str
+    risk_level: str
+    severity: str = "medium"
+
+# =========================
+# 🔔 SEND RISK NOTIFICATION
+# =========================
+@app.post("/send-risk-notification")
+def send_risk_notification(req: RiskNotificationRequest):
+    try:
+        result = send_risk_alert_notification(
+            token=req.token,
+            crop=req.crop,
+            disease_name=req.disease_name,
+            risk_level=req.risk_level,
+            severity=req.severity,
+        )
+
+        return result
+
+    except Exception as e:
+        print("NOTIFICATION ERROR:", e)
+        traceback.print_exc()
+
+        return {
+            "success": False,
+            "message": "Notification failed"
         }
