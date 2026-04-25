@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'app_config.dart';
 
 class ApiService {
-  static const String baseUrl = "http://127.0.0.1:8000";
+  static const String baseUrl = "http://192.168.8.125:8000";
 
   // =========================
   // MOBILE

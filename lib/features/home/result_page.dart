@@ -1,9 +1,52 @@
 import 'package:flutter/material.dart';
 
+import '../../services/saved_treatment_service.dart';
+
 class ResultPage extends StatelessWidget {
   final Map<String, dynamic> data;
 
   const ResultPage({super.key, required this.data});
+
+  Future<void> _saveTreatment({
+    required BuildContext context,
+    required String disease,
+    required String risk,
+    required String description,
+    required List<dynamic> treatment,
+    required double accuracy,
+  }) async {
+    try {
+      final List<String> treatmentList =
+          treatment.map((e) => e.toString()).toList();
+
+      await SavedTreatmentService.saveTreatment(
+        diseaseName: disease,
+        crop: data["crop"]?.toString() ?? data["selectedCrop"]?.toString() ?? "Unknown Crop",
+        riskLevel: risk,
+        description: description,
+        treatments: treatmentList,
+        accuracy: accuracy,
+      );
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ Treatment saved successfully"),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("❌ Failed to save treatment: $e"),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,11 +64,9 @@ class ResultPage extends StatelessWidget {
     final Color sectionBg =
         isDark ? const Color(0xFF161B22) : Colors.grey.shade50;
 
-    final Color mainText =
-        isDark ? Colors.white : Colors.black87;
+    final Color mainText = isDark ? Colors.white : Colors.black87;
 
-    final Color subText =
-        isDark ? Colors.white70 : Colors.black87;
+    final Color subText = isDark ? Colors.white70 : Colors.black87;
 
     final Color borderColor =
         isDark ? Colors.white.withOpacity(0.08) : Colors.transparent;
@@ -36,8 +77,7 @@ class ResultPage extends StatelessWidget {
     // =========================
     // SAFE DATA HANDLING 🔥
     // =========================
-    final String disease =
-        data["disease"]?.toString() ?? "Unknown Disease";
+    final String disease = data["disease"]?.toString() ?? "Unknown Disease";
 
     final double accuracy =
         (data["accuracy"] is num) ? (data["accuracy"] as num).toDouble() : 0.0;
@@ -63,6 +103,19 @@ class ResultPage extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: mainText),
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: mainText,
+          ),
+          onPressed: () {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/home',
+              (route) => false,
+            );
+          },
+        ),
         title: Text(
           "Detection Result",
           style: TextStyle(
@@ -82,7 +135,6 @@ class ResultPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               // =========================
               // 🔥 RESULT CARD
               // =========================
@@ -104,7 +156,6 @@ class ResultPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
                     // DISEASE
                     Row(
                       children: [
@@ -274,9 +325,8 @@ class ResultPage extends StatelessWidget {
                         foregroundColor:
                             isDark ? Colors.green.shade300 : Colors.green,
                         side: BorderSide(
-                          color: isDark
-                              ? Colors.green.shade700
-                              : Colors.green,
+                          color:
+                              isDark ? Colors.green.shade700 : Colors.green,
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
@@ -294,9 +344,17 @@ class ResultPage extends StatelessWidget {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      onPressed: () =>
-                          Navigator.popUntil(context, (r) => r.isFirst),
-                      child: const Text("Back to Home"),
+                      onPressed: () {
+                        _saveTreatment(
+                          context: context,
+                          disease: disease,
+                          risk: risk,
+                          description: description,
+                          treatment: treatment,
+                          accuracy: accuracy,
+                        );
+                      },
+                      child: const Text("Save Treatment"),
                     ),
                   ),
                 ],
