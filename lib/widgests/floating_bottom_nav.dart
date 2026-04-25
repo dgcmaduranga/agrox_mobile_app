@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'translated_text.dart';
 
@@ -19,88 +21,120 @@ class FloatingBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final navColor = isDark
-      ? const Color(0xFF1C1C1E)
-      : Colors.white;
+    final Color navColor = isDark
+        ? const Color(0xFF161B22).withOpacity(0.94)
+        : Colors.white.withOpacity(0.94);
+
+    final Color borderColor = isDark
+        ? Colors.white.withOpacity(0.08)
+        : Colors.white.withOpacity(0.70);
 
     return SafeArea(
-      bottom: false, // 🔥 VERY IMPORTANT (fix gap issue)
+      bottom: false,
       child: SizedBox(
-        height: 65, // compact overall height
+        height: 86,
         child: Stack(
           clipBehavior: Clip.none,
           alignment: Alignment.bottomCenter,
           children: [
-
-            // 🔹 NAV BAR
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              height: 58, // compact nav
-              decoration: BoxDecoration(
-                color: navColor,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.5 : 0.08),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _navItem(
-                    icon: Icons.home,
-                    label: "Home",
-                    index: 0,
-                  ),
-
-                  if (showCenterButton) const SizedBox(width: 50),
-
-                  _navItem(
-                    icon: Icons.person,
-                    label: "Profile",
-                    index: 1,
-                  ),
-                ],
-              ),
-            ),
-
-            // 🔥 CENTER BUTTON (ONLY IF ENABLED)
-            if (showCenterButton)
-              Positioned(
-                top: -16, // 🔥 FLOAT PROPERLY (not too high)
-                child: GestureDetector(
-                  onTap: onCenterTap,
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 14,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(34),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                   child: Container(
-                    height: 54,
-                    width: 54,
+                    height: 66,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                      color: navColor,
+                      borderRadius: BorderRadius.circular(34),
+                      border: Border.all(
+                        color: borderColor,
+                        width: 1,
                       ),
                       boxShadow: [
-                        // glow
                         BoxShadow(
-                          color: const Color(0xFF22C55E).withOpacity(0.35),
-                          blurRadius: 14,
-                        ),
-                        // depth
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
+                          color: Colors.black.withOpacity(
+                            isDark ? 0.42 : 0.10,
+                          ),
+                          blurRadius: 24,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 10),
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      color: Colors.white,
-                      size: 24,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _navItem(
+                          icon: Icons.home_rounded,
+                          label: "Home",
+                          index: 0,
+                        ),
+                        if (showCenterButton) const SizedBox(width: 70),
+                        _navItem(
+                          icon: Icons.person_rounded,
+                          label: "Profile",
+                          index: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            if (showCenterButton)
+              Positioned(
+                top: 0,
+                child: GestureDetector(
+                  onTap: onCenterTap,
+                  child: Container(
+                    height: 64,
+                    width: 64,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark
+                          ? const Color(0xFF0B0F14)
+                          : const Color(0xFFF6F7F9),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(
+                            isDark ? 0.42 : 0.14,
+                          ),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF2EEA6B),
+                            Color(0xFF16A34A),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF22C55E).withOpacity(0.45),
+                            blurRadius: 22,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt_rounded,
+                        color: Colors.white,
+                        size: 27,
+                      ),
                     ),
                   ),
                 ),
@@ -118,35 +152,54 @@ class FloatingBottomNav extends StatelessWidget {
   }) {
     final bool active = index == activeIndex;
 
+    final Color activeColor = const Color(0xFF22C55E);
+    final Color inactiveColor = isDark ? Colors.white60 : Colors.black45;
+
     return GestureDetector(
       onTap: () => onTap(index),
+      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        width: 96,
+        height: 50,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: active
-              ? const Color(0xFF22C55E).withOpacity(0.12)
+              ? activeColor.withOpacity(isDark ? 0.16 : 0.12)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(24),
+          border: active
+              ? Border.all(
+                  color: activeColor.withOpacity(0.22),
+                  width: 1,
+                )
+              : null,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 24,
-              color: active
-                  ? const Color(0xFF22C55E)
-                  : (isDark ? Colors.white70 : Colors.grey),
+            AnimatedScale(
+              scale: active ? 1.08 : 1.0,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              child: Icon(
+                icon,
+                size: 22,
+                color: active ? activeColor : inactiveColor,
+              ),
             ),
-            const SizedBox(height: 3),
-            TranslatedText(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: active
-                    ? const Color(0xFF22C55E)
-                    : (isDark ? Colors.white70 : Colors.grey),
+            const SizedBox(height: 2),
+            Flexible(
+              child: TranslatedText(
+                label,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  height: 1,
+                  fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                  color: active ? activeColor : inactiveColor,
+                ),
               ),
             ),
           ],

@@ -3,12 +3,16 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import '../../services/theme_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-// 🔥 ADD
+import '../../services/theme_provider.dart';
 import '../../services/language_provider.dart';
+import '../../services/notification_service.dart';
 import '../../widgests/translated_text.dart';
+
 import 'change_password_page.dart';
+import 'detection_history_page.dart';
+import 'saved_treatments_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -18,13 +22,97 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  static const String _notificationPrefKey = 'agrox_notifications_enabled';
+
   bool _notifications = true;
+  bool _notificationLoading = true;
+
   final user = FirebaseAuth.instance.currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationPreference();
+  }
+
+  // =========================
+  // 🔔 LOAD NOTIFICATION SETTING
+  // =========================
+  Future<void> _loadNotificationPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedValue = prefs.getBool(_notificationPrefKey);
+
+      if (!mounted) return;
+
+      setState(() {
+        _notifications = savedValue ?? true;
+        _notificationLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _notifications = true;
+        _notificationLoading = false;
+      });
+    }
+  }
+
+  // =========================
+  // 🔔 TOGGLE NOTIFICATIONS
+  // =========================
+  Future<void> _toggleNotifications(bool value) async {
+    if (_notificationLoading) return;
+
+    setState(() {
+      _notifications = value;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_notificationPrefKey, value);
+
+      if (value) {
+        await NotificationService.instance.init();
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notifications turned on'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notifications turned off'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _notifications = !value;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Notification setting error: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   // 🔥 LANGUAGE CHANGE (use provider, no restart)
   void changeLang(String lang) {
-    final provider =
-        Provider.of<LanguageProvider>(context, listen: false);
+    final provider = Provider.of<LanguageProvider>(context, listen: false);
     provider.setLanguage(lang);
   }
 
@@ -73,14 +161,14 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor:
           isDark ? const Color(0xFF121212) : const Color(0xFFF6F7F9),
-
       appBar: AppBar(
-        backgroundColor:
-            isDark ? const Color(0xFF121212) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back,
-              color: isDark ? Colors.white : Colors.black),
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDark ? Colors.white : Colors.black,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: const TranslatedText(
@@ -88,7 +176,6 @@ class _ProfilePageState extends State<ProfilePage> {
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
-
       body: Column(
         children: [
           Expanded(
@@ -97,7 +184,6 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   /// PROFILE CARD (modern compact)
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -120,35 +206,42 @@ class _ProfilePageState extends State<ProfilePage> {
                         CircleAvatar(
                           radius: 22,
                           backgroundColor: Colors.green.shade200,
-                          child: Text(user?.email?[0].toUpperCase() ?? "U",
-                              style: const TextStyle(fontSize: 14)),
+                          child: Text(
+                            user?.email?[0].toUpperCase() ?? "U",
+                            style: const TextStyle(fontSize: 14),
+                          ),
                         ),
                         const SizedBox(width: 12),
-
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(user?.displayName ?? "User",
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDark ? Colors.white : Colors.black,
-                                  )),
+                              Text(
+                                user?.displayName ?? "User",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
                               const SizedBox(height: 2),
-                              Text(user?.email ?? "",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark ? Colors.grey : Colors.black54,
-                                  )),
+                              Text(
+                                user?.email ?? "",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.grey : Colors.black54,
+                                ),
+                              ),
                             ],
                           ),
                         ),
-
                         IconButton(
                           onPressed: _showEditProfileDialog,
-                          icon: Icon(Icons.edit,
-                              size: 18, color: isDark ? Colors.white : Colors.black),
+                          icon: Icon(
+                            Icons.edit,
+                            size: 18,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
                         )
                       ],
                     ),
@@ -160,19 +253,87 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   _tile(
                     icon: Icons.person,
-                    titleWidget: const TranslatedText('Edit Profile', style: TextStyle(fontSize:14,fontWeight: FontWeight.w500)),
-                    subtitleWidget: const TranslatedText('Update your details', style: TextStyle(fontSize:11)),
+                    titleWidget: const TranslatedText(
+                      'Edit Profile',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitleWidget: const TranslatedText(
+                      'Update your details',
+                      style: TextStyle(fontSize: 11),
+                    ),
                     isDark: isDark,
                     onTap: _showEditProfileDialog,
                   ),
 
                   _tile(
                     icon: Icons.lock,
-                    titleWidget: const TranslatedText('Change Password', style: TextStyle(fontSize:14,fontWeight: FontWeight.w500)),
+                    titleWidget: const TranslatedText(
+                      'Change Password',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     subtitle: user?.email ?? "",
                     isDark: isDark,
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordPage()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ChangePasswordPage(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _tile(
+                    icon: Icons.history_rounded,
+                    titleWidget: const TranslatedText(
+                      'Detection History',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitleWidget: const TranslatedText(
+                      'View your last 5 detection results',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DetectionHistoryPage(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _tile(
+                    icon: Icons.bookmark_rounded,
+                    titleWidget: const TranslatedText(
+                      'Saved Treatments',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitleWidget: const TranslatedText(
+                      'View your saved treatment tips',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SavedTreatmentsPage(),
+                        ),
+                      );
                     },
                   ),
 
@@ -190,11 +351,21 @@ class _ProfilePageState extends State<ProfilePage> {
                     },
                   ),
 
+                  // =========================
+                  // ✅ NOTIFICATION ON / OFF BUTTON
+                  // =========================
+                  _switchTile(
+                    icon: _notifications
+                        ? Icons.notifications_active_rounded
+                        : Icons.notifications_off_rounded,
+                    title: "Notifications",
+                    value: _notifications,
+                    isDark: isDark,
+                    onChanged: _toggleNotifications,
+                  ),
+
                   const SizedBox(height: 10),
 
-                  // =========================
-                  // 🌐 LANGUAGE SECTION
-                  // =========================
                   _sectionTitle("Language", isDark),
 
                   _tile(
@@ -212,27 +383,47 @@ class _ProfilePageState extends State<ProfilePage> {
                   Container(
                     margin: const EdgeInsets.only(bottom: 5),
                     padding: const EdgeInsets.symmetric(
-                        vertical: 12, horizontal: 12),
+                      vertical: 12,
+                      horizontal: 12,
+                    ),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1E1E1E)
-                          : Colors.white,
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info,
-                            color: Colors.green, size: 18),
+                        const Icon(
+                          Icons.info,
+                          color: Colors.green,
+                          size: 18,
+                        ),
                         const SizedBox(width: 10),
-
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                                  TranslatedText('AgroX', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
-                                  TranslatedText('Version 1.0.0', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey : Colors.black54)),
-                                  TranslatedText('AI-powered agriculture assistant', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey : Colors.black54)),
+                              TranslatedText(
+                                'AgroX',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              TranslatedText(
+                                'Version 1.0.0',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? Colors.grey : Colors.black54,
+                                ),
+                              ),
+                              TranslatedText(
+                                'AI-powered agriculture assistant',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? Colors.grey : Colors.black54,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -259,34 +450,35 @@ class _ProfilePageState extends State<ProfilePage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Center(
-                  child: Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
         ],
       ),
-
       bottomNavigationBar: BottomAppBar(
-        color:
-            isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 8,
         child: SizedBox(
           height: 60,
           child: Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-                _navItem(Icons.home, 'Home', 0),
-                _navItem(Icons.person, 'Profile', 1),
-              ],
+              _navItem(Icons.home, 'Home', 0),
+              _navItem(Icons.person, 'Profile', 1),
+            ],
           ),
         ),
       ),
     );
   }
-
-  
 
   ////////////////////////////////////////////////////////////
 
@@ -300,20 +492,20 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       },
       child: Column(
-        mainAxisAlignment:
-            MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon,
-              color: isSelected
-                  ? Colors.green
-                  : Colors.grey),
+          Icon(
+            icon,
+            color: isSelected ? Colors.green : Colors.grey,
+          ),
           const SizedBox(height: 2),
-            TranslatedText(
+          TranslatedText(
             label,
             style: TextStyle(
               fontSize: 12,
-              color: isSelected ? Colors.green : Colors.grey),
+              color: isSelected ? Colors.green : Colors.grey,
             ),
+          ),
         ],
       ),
     );
@@ -321,13 +513,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
   ////////////////////////////////////////////////////////////
 
-  // Generic styled dialog with backdrop blur
   Future<T?> _showStyledDialog<T>({required Widget child}) {
     return showDialog<T>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
-        final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+        final isDark =
+            Provider.of<ThemeProvider>(context, listen: false).isDark;
 
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
@@ -355,15 +547,26 @@ class _ProfilePageState extends State<ProfilePage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Edit Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black)),
+          Text(
+            'Edit Profile',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : Colors.black,
+            ),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: controller,
             style: TextStyle(color: isDark ? Colors.white : Colors.black),
             decoration: InputDecoration(
               labelText: 'Name',
-              labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700]),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              labelStyle: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[700],
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               isDense: true,
             ),
           ),
@@ -382,10 +585,14 @@ class _ProfilePageState extends State<ProfilePage> {
                     await user!.updateDisplayName(controller.text.trim());
                     Navigator.pop(context);
                     setState(() {});
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Profile updated')),
+                    );
                   } catch (e) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e')),
+                    );
                   }
                 },
                 child: const Text('Save'),
@@ -397,9 +604,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Logout confirmation with blur background
   Future<void> _showLogoutConfirmation() async {
     final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+
     return showDialog(
       context: context,
       barrierDismissible: true,
@@ -409,11 +616,24 @@ class _ProfilePageState extends State<ProfilePage> {
           filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
           child: AlertDialog(
             backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Text('Confirm Logout', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-            content: Text('Are you sure you want to logout?', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              'Confirm Logout',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            ),
+            content: Text(
+              'Are you sure you want to logout?',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+            ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
               ElevatedButton(
                 onPressed: () async {
                   await FirebaseAuth.instance.signOut();
@@ -444,46 +664,41 @@ class _ProfilePageState extends State<ProfilePage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-      margin:
-        const EdgeInsets.only(bottom: 5),
-      padding: const EdgeInsets.symmetric(
-        vertical: 12, horizontal: 12),
-      decoration: BoxDecoration(
-        color: isDark
-          ? const Color(0xFF1E1E1E)
-          : Colors.white,
-        borderRadius:
-          BorderRadius.circular(16),
-      ),
+        margin: const EdgeInsets.only(bottom: 5),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Row(
           children: [
-            Icon(icon,
-                size: 18, color: Colors.green),
+            Icon(icon, size: 18, color: Colors.green),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  titleWidget ?? Text(title ?? '',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight:
-                        FontWeight.w500,
-                      color: isDark
-                        ? Colors.white
-                        : Colors.black)),
-                  subtitleWidget ?? Text(subtitle ?? '',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                        ? Colors.grey
-                        : Colors.black54)),
+                  titleWidget ??
+                      Text(
+                        title ?? '',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ),
+                  subtitleWidget ??
+                      Text(
+                        subtitle ?? '',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.grey : Colors.black54,
+                        ),
+                      ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios,
-                size: 12),
+            const Icon(Icons.arrow_forward_ios, size: 12),
           ],
         ),
       ),
@@ -498,30 +713,30 @@ class _ProfilePageState extends State<ProfilePage> {
     required Function(bool) onChanged,
   }) {
     return Container(
-      margin:
-        const EdgeInsets.only(bottom: 5),
-      padding: const EdgeInsets.symmetric(
-        vertical: 12, horizontal: 12),
+      margin: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF1E1E1E)
-            : Colors.white,
-        borderRadius:
-            BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          Icon(icon,
-              size: 18, color: Colors.green),
+          Icon(icon, size: 18, color: Colors.green),
           const SizedBox(width: 10),
           Expanded(
-              child: Text(title,
-                  style: TextStyle(
-                      fontSize: 14,
-                      color: isDark
-                          ? Colors.white
-                          : Colors.black))),
-          Switch(value: value, onChanged: onChanged),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
+          ),
+          Switch(
+            value: value,
+            activeColor: Colors.green,
+            onChanged: onChanged,
+          ),
         ],
       ),
     );
@@ -543,8 +758,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _languageTile(String label, String code) {
     final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+
     return ListTile(
-      title: Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white : Colors.black,
+        ),
+      ),
       onTap: () {
         changeLang(code);
         Navigator.pop(context);

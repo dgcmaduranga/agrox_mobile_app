@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../services/api_service.dart';
+import '../../services/history_service.dart';
 import 'result_page.dart';
 
 class DetectPage extends StatefulWidget {
@@ -82,6 +83,8 @@ class _DetectPageState extends State<DetectPage> {
   // DETECT
   // =========================
   Future detect() async {
+    if (isLoading) return;
+
     if (_image == null && webImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -122,9 +125,34 @@ class _DetectPageState extends State<DetectPage> {
 
     if (!mounted) return;
 
-    setState(() => isLoading = false);
-
     if (res != null && res["status"] == "success") {
+      // =========================
+      // ✅ ADD SELECTED CROP TO RESULT DATA
+      // Needed for ResultPage and Saved Treatments
+      // =========================
+      res["crop"] = selectedCrop;
+
+      // =========================
+      // ✅ SAVE RECENT DETECTION HISTORY
+      // =========================
+      try {
+        await HistoryService.saveDetection(
+          diseaseName: res["disease"]?.toString() ?? "Unknown Disease",
+          crop: selectedCrop,
+          riskLevel: res["risk"]?.toString() ?? "Low",
+          accuracy: res["accuracy"] is num
+              ? (res["accuracy"] as num).toDouble()
+              : double.tryParse(res["accuracy"]?.toString() ?? "0") ?? 0.0,
+          dateTime: DateTime.now(),
+        );
+      } catch (e) {
+        print("History Save Error: $e");
+      }
+
+      if (!mounted) return;
+
+      setState(() => isLoading = false);
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -132,6 +160,8 @@ class _DetectPageState extends State<DetectPage> {
         ),
       );
     } else {
+      setState(() => isLoading = false);
+
       String label = res?["prediction"] ?? "";
       String message = res?["message"] ?? "";
 
@@ -164,17 +194,14 @@ class _DetectPageState extends State<DetectPage> {
     final Color scaffoldBg =
         isDark ? const Color(0xFF0B0F14) : const Color(0xFFF6F8F5);
 
-    final Color cardBg =
-        isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
 
     final Color softGreenBg =
         isDark ? const Color(0xFF102A1A) : const Color(0xFFEAF8E7);
 
-    final Color mainText =
-        isDark ? Colors.white : Colors.black87;
+    final Color mainText = isDark ? Colors.white : Colors.black87;
 
-    final Color subText =
-        isDark ? Colors.white60 : Colors.grey.shade600;
+    final Color subText = isDark ? Colors.white60 : Colors.grey.shade600;
 
     final Color borderColor =
         isDark ? Colors.green.shade700 : Colors.green.shade300;
@@ -197,230 +224,258 @@ class _DetectPageState extends State<DetectPage> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Text(
-                    "Select your leaf type first",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: mainText,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 6),
-
-                Center(
-                  child: Text(
-                    "Choose the crop leaf before capturing or uploading",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: subText,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    cropCard(
-                      crop: "tea",
-                      emoji: "🍃",
-                      label: "Tea Leaf",
-                      isDark: isDark,
-                    ),
-                    cropCard(
-                      crop: "coconut",
-                      emoji: "🥥",
-                      label: "Coconut Leaf",
-                      isDark: isDark,
-                    ),
-                    cropCard(
-                      crop: "rice",
-                      emoji: "🌾",
-                      label: "Rice Leaf",
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 22),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: _actionButton(
-                        icon: Icons.camera_alt_rounded,
-                        label: "Camera",
-                        onTap: isLoading ? null : captureImage,
-                        isDark: isDark,
+                    Center(
+                      child: Text(
+                        "Select your leaf type first",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: mainText,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _actionButton(
-                        icon: Icons.file_upload_outlined,
-                        label: "Upload",
-                        onTap: isLoading ? null : pickImage,
-                        isDark: isDark,
+
+                    const SizedBox(height: 6),
+
+                    Center(
+                      child: Text(
+                        "Choose the crop leaf before capturing or uploading",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: subText,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ],
-                ),
 
-                const SizedBox(height: 20),
+                    const SizedBox(height: 18),
 
-                Container(
-                  height: 245,
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: borderColor,
-                      width: 1.6,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        cropCard(
+                          crop: "tea",
+                          emoji: "🍃",
+                          label: "Tea Leaf",
+                          isDark: isDark,
+                        ),
+                        cropCard(
+                          crop: "coconut",
+                          emoji: "🥥",
+                          label: "Coconut Leaf",
+                          isDark: isDark,
+                        ),
+                        cropCard(
+                          crop: "rice",
+                          emoji: "🌾",
+                          label: "Rice Leaf",
+                          isDark: isDark,
+                        ),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isDark
-                            ? Colors.black.withOpacity(0.25)
-                            : Colors.green.withOpacity(0.08),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
+
+                    const SizedBox(height: 22),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _actionButton(
+                            icon: Icons.camera_alt_rounded,
+                            label: "Camera",
+                            onTap: isLoading ? null : captureImage,
+                            isDark: isDark,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _actionButton(
+                            icon: Icons.file_upload_outlined,
+                            label: "Upload",
+                            onTap: isLoading ? null : pickImage,
+                            isDark: isDark,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    Container(
+                      height: 245,
                       width: double.infinity,
-                      height: double.infinity,
-                      color: softGreenBg,
-                      child: Center(
-                        child: (kIsWeb && webImage != null)
-                            ? InteractiveViewer(
-                                minScale: 0.8,
-                                maxScale: 4,
-                                child: Image.memory(
-                                  webImage!,
-                                  fit: BoxFit.contain,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                ),
-                              )
-                            : (_image != null)
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: borderColor,
+                          width: 1.6,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark
+                                ? Colors.black.withOpacity(0.25)
+                                : Colors.green.withOpacity(0.08),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          width: double.infinity,
+                          height: double.infinity,
+                          color: softGreenBg,
+                          child: Center(
+                            child: (kIsWeb && webImage != null)
                                 ? InteractiveViewer(
                                     minScale: 0.8,
                                     maxScale: 4,
-                                    child: Image.file(
-                                      _image!,
+                                    child: Image.memory(
+                                      webImage!,
                                       fit: BoxFit.contain,
                                       width: double.infinity,
                                       height: double.infinity,
                                     ),
                                   )
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 58,
-                                        height: 58,
-                                        decoration: BoxDecoration(
-                                          color: isDark
-                                              ? const Color(0xFF1F2937)
-                                              : Colors.white,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: isDark
-                                                ? Colors.green.shade700
-                                                : Colors.green.shade200,
+                                : (_image != null)
+                                    ? InteractiveViewer(
+                                        minScale: 0.8,
+                                        maxScale: 4,
+                                        child: Image.file(
+                                          _image!,
+                                          fit: BoxFit.contain,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                        ),
+                                      )
+                                    : Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 58,
+                                            height: 58,
+                                            decoration: BoxDecoration(
+                                              color: isDark
+                                                  ? const Color(0xFF1F2937)
+                                                  : Colors.white,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: isDark
+                                                    ? Colors.green.shade700
+                                                    : Colors.green.shade200,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              Icons.image_outlined,
+                                              color: Colors.green.shade500,
+                                              size: 30,
+                                            ),
                                           ),
-                                        ),
-                                        child: Icon(
-                                          Icons.image_outlined,
-                                          color: Colors.green.shade500,
-                                          size: 30,
-                                        ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            "No image selected",
+                                            style: TextStyle(
+                                              color: isDark
+                                                  ? Colors.white70
+                                                  : Colors.grey.shade700,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            "Capture or upload a clear leaf image",
+                                            style: TextStyle(
+                                              color: isDark
+                                                  ? Colors.white38
+                                                  : Colors.grey.shade500,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        "No image selected",
-                                        style: TextStyle(
-                                          color: isDark
-                                              ? Colors.white70
-                                              : Colors.grey.shade700,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        "Capture or upload a clear leaf image",
-                                        style: TextStyle(
-                                          color: isDark
-                                              ? Colors.white38
-                                              : Colors.grey.shade500,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: isLoading ? null : detect,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2ECC4A),
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor:
-                          isDark ? Colors.green.shade900 : Colors.green.shade200,
-                      elevation: 6,
-                      shadowColor: Colors.green.withOpacity(0.35),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.4,
-                            ),
-                          )
-                        : const Text(
-                            "Detect Disease",
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                            ),
                           ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : detect,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2ECC4A),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: isDark
+                              ? Colors.green.shade900
+                              : Colors.green.shade200,
+                          elevation: 6,
+                          shadowColor: Colors.green.withOpacity(0.35),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                        child: isLoading
+                            ? const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.4,
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    "Detecting...",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : const Text(
+                                "Detect Disease",
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            if (isLoading)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.08),
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
+          ],
         ),
       ),
     );
@@ -495,7 +550,7 @@ class _DetectPageState extends State<DetectPage> {
     final bool selected = selectedCrop == crop;
 
     return GestureDetector(
-      onTap: () => setState(() => selectedCrop = crop),
+      onTap: isLoading ? null : () => setState(() => selectedCrop = crop),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         width: 96,
@@ -547,7 +602,6 @@ class _DetectPageState extends State<DetectPage> {
                 ],
               ),
             ),
-
             if (selected)
               Positioned(
                 right: 0,

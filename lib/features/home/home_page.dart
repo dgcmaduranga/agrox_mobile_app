@@ -138,15 +138,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   IconData riskIcon = Icons.check_circle;
 
   Timer? _refreshTimer;
+  Timer? _lastUpdatedTimer;
   int _bottomIndex = 0;
 
-  // notification duplicate avoid
-  String? _lastNotificationKey;
+  DateTime? _lastUpdatedAt;
+
+  // Avoid duplicate notifications for same crop/disease/severity in same day
+  final Set<String> _sentNotificationKeys = {};
 
   final List<Map<String, String>> crops = [
-    {'key': 'coconut', 'label': 'Coconut', 'asset': 'assets/images/coconut.png'},
-    {'key': 'tea', 'label': 'Tea', 'asset': 'assets/images/tea.png'},
-    {'key': 'rice', 'label': 'Rice', 'asset': 'assets/images/paddy.png'},
+    {
+      'key': 'coconut',
+      'label': 'Coconut',
+      'asset': 'assets/images/coconut.png',
+    },
+    {
+      'key': 'tea',
+      'label': 'Tea',
+      'asset': 'assets/images/tea.png',
+    },
+    {
+      'key': 'rice',
+      'label': 'Rice',
+      'asset': 'assets/images/paddy.png',
+    },
   ];
 
   @override
@@ -155,14 +170,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _loadAll();
 
-    _refreshTimer = Timer.periodic(const Duration(minutes: 10), (_) {
+    // Weather and risk auto refresh
+    _refreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
       if (mounted) _loadAll();
+    });
+
+    // Last updated text refresh
+    _lastUpdatedTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _lastUpdatedTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -170,6 +192,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _loadAll();
+  }
+
+  String _lastUpdatedText() {
+    if (_lastUpdatedAt == null) {
+      return 'Not updated yet';
+    }
+
+    final diff = DateTime.now().difference(_lastUpdatedAt!);
+
+    if (diff.inSeconds < 60) {
+      return 'Updated just now';
+    }
+
+    if (diff.inMinutes < 60) {
+      return 'Updated ${diff.inMinutes} mins ago';
+    }
+
+    if (diff.inHours < 24) {
+      return 'Updated ${diff.inHours} hours ago';
+    }
+
+    return 'Updated ${diff.inDays} days ago';
+  }
+
+  Future<void> _manualRefreshWeather() async {
+    if (isLoading) return;
+    await _loadAll();
   }
 
   Future<void> _loadAll() async {
@@ -224,14 +273,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       final diseases = await fetchDiseases();
 
-      final bool hasRain = w != null &&
-          w['raw'] != null &&
-          (w['raw']['rain'] != null ||
-              (w['raw']['weather'] != null &&
-                  (w['raw']['weather'] as List).any(
-                    (it) => (it['main']?.toString().toLowerCase() ?? '')
-                        .contains('rain'),
-                  )));
+      final bool hasRain = _hasRainFromWeather(w);
 
       final cropKeys = crops
           .map((c) => (c['key'] ?? '').toString().toLowerCase())
@@ -261,10 +303,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
         riskList = scored.map((d) => d.toJson()).toList();
         isLoading = false;
+        _lastUpdatedAt = DateTime.now();
       });
 
       _calculateRiskSummary();
+      await _sendAllRiskNotificationsIfNeeded();
     } catch (e) {
+      print('HomePage load error: $e');
+
       setState(() {
         isLoading = false;
         weather = null;
@@ -272,6 +318,48 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         riskText = "Unable to fetch data";
       });
     }
+  }
+
+  bool _hasRainFromWeather(Map<String, dynamic>? w) {
+    if (w == null) return false;
+
+    final dynamic rainValue = w['rain'];
+
+    if (rainValue is num && rainValue > 0) return true;
+
+    final raw = w['raw'];
+
+    if (raw is Map) {
+      if (raw['rain'] != null) return true;
+
+      final weatherList = raw['weather'];
+
+      if (weatherList is List) {
+        return weatherList.any((it) {
+          if (it is! Map) return false;
+
+          final main = it['main']?.toString().toLowerCase() ?? '';
+          final description = it['description']?.toString().toLowerCase() ?? '';
+
+          return main.contains('rain') ||
+              main.contains('drizzle') ||
+              main.contains('thunder') ||
+              description.contains('rain') ||
+              description.contains('drizzle') ||
+              description.contains('shower');
+        });
+      }
+    }
+
+    final condition = w['condition']?.toString().toLowerCase() ?? '';
+    final description = w['description']?.toString().toLowerCase() ?? '';
+
+    return condition.contains('rain') ||
+        condition.contains('drizzle') ||
+        condition.contains('thunder') ||
+        description.contains('rain') ||
+        description.contains('drizzle') ||
+        description.contains('shower');
   }
 
   Future<List<Disease>> fetchDiseases() async {
@@ -291,6 +379,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       return [];
     } catch (e) {
+      print('Fetch diseases error: $e');
       return [];
     }
   }
@@ -313,7 +402,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       if (severity.contains('high') || severity.contains('severe')) {
         highCount++;
-      } else if (severity.contains('medium')) {
+      } else if (severity.contains('medium') ||
+          severity.contains('moderate')) {
         mediumCount++;
       }
     }
@@ -341,89 +431,44 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       riskColor = newRiskColor;
       riskIcon = newRiskIcon;
     });
-
-    _sendRiskNotificationIfNeeded(newRiskText);
   }
 
-  Future<void> _sendRiskNotificationIfNeeded(String levelText) async {
+  Future<void> _sendAllRiskNotificationsIfNeeded() async {
     try {
-      final lowerLevel = levelText.toLowerCase();
-
-      if (!lowerLevel.contains('high') && !lowerLevel.contains('medium')) {
-        return;
-      }
-
       if (riskList.isEmpty) return;
 
-      Map<String, dynamic>? selectedRisk;
+      final topDiseases = _riskMapsToDiseases(riskList);
+      final alerts = RiskService.topRisksForNotificationPerCrop(topDiseases);
 
-      for (final item in riskList) {
-        final map = Map<String, dynamic>.from(item as Map);
-        final severity = (map['severity'] ?? '').toString().toLowerCase();
+      if (alerts.isEmpty) return;
 
-        if (lowerLevel.contains('high') &&
-            (severity.contains('high') || severity.contains('severe'))) {
-          selectedRisk = map;
-          break;
+      for (final disease in alerts) {
+        final severity = disease.severity;
+        final riskLevel = RiskService.displayRiskLevel(severity);
+
+        final key =
+            '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}-${disease.crop}-${disease.name}-${severity}';
+
+        if (_sentNotificationKeys.contains(key)) {
+          continue;
         }
 
-        if (lowerLevel.contains('medium') && severity.contains('medium')) {
-          selectedRisk = map;
-          break;
-        }
+        _sentNotificationKeys.add(key);
+
+        await NotificationService.instance.showRiskNotification(
+          crop: _formatCropName(disease.crop),
+          diseaseName: disease.name,
+          riskLevel: riskLevel,
+          severity: RiskService.displaySeverity(severity),
+        );
       }
-
-      selectedRisk ??= Map<String, dynamic>.from(riskList.first as Map);
-
-      final crop = (selectedRisk['crop'] ??
-              selectedRisk['crop_type'] ??
-              selectedRisk['plant'] ??
-              selectedRisk['category'] ??
-              'Crop')
-          .toString();
-
-      final diseaseName = (selectedRisk['name'] ??
-              selectedRisk['disease'] ??
-              selectedRisk['title'] ??
-              selectedRisk['disease_name'] ??
-              'Disease risk')
-          .toString();
-
-      final severity = (selectedRisk['severity'] ?? levelText).toString();
-
-      final notificationKey =
-          '${DateTime.now().day}-$crop-$diseaseName-$severity-$levelText';
-
-      if (_lastNotificationKey == notificationKey) {
-        return;
-      }
-
-      _lastNotificationKey = notificationKey;
-
-      await NotificationService.instance.showRiskNotification(
-        crop: crop,
-        diseaseName: diseaseName,
-        riskLevel: levelText,
-        severity: severity,
-      );
     } catch (e) {
       print('Risk notification error: $e');
     }
   }
 
-  bool get _showRiskDot {
-    try {
-      return riskList.isNotEmpty &&
-          riskList.take(3).any((d) => (d['score'] ?? 0) > 0);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  void _showRiskModal() {
-    final topMaps = riskList.isNotEmpty ? riskList.take(3).toList() : [];
-
-    final topDiseases = topMaps.map((m) {
+  List<Disease> _riskMapsToDiseases(List<dynamic> maps) {
+    return maps.map((m) {
       final Map<String, dynamic> map = Map<String, dynamic>.from(m as Map);
       final d = Disease.fromJson(map);
 
@@ -445,6 +490,40 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       return d;
     }).toList();
+  }
+
+  String _formatCropName(String crop) {
+    final c = crop.toLowerCase().trim();
+
+    if (c == 'rice' || c == 'paddy') return 'Rice';
+    if (c == 'tea') return 'Tea';
+    if (c == 'coconut') return 'Coconut';
+
+    if (crop.trim().isEmpty) return 'Crop';
+
+    return crop[0].toUpperCase() + crop.substring(1);
+  }
+
+  bool get _showRiskDot {
+    try {
+      return riskList.isNotEmpty &&
+          riskList.take(3).any((d) {
+            final severity = (d['severity'] ?? '').toString().toLowerCase();
+
+            return severity.contains('high') ||
+                severity.contains('severe') ||
+                severity.contains('medium') ||
+                severity.contains('moderate');
+          });
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _showRiskModal() {
+    final topMaps = riskList.isNotEmpty ? riskList.take(3).toList() : [];
+
+    final topDiseases = _riskMapsToDiseases(topMaps);
 
     Navigator.push(
       context,
@@ -532,13 +611,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             isDark: isDark,
                             statusText: riskText,
                             statusColor: riskColor,
+                            lastUpdatedText: _lastUpdatedText(),
+                            onRefresh: _manualRefreshWeather,
                           ),
                         ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 115),
+                  const SizedBox(height: 130),
 
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: padding),
@@ -881,6 +962,8 @@ class WeatherCard extends StatelessWidget {
   final bool isDark;
   final String statusText;
   final Color statusColor;
+  final String lastUpdatedText;
+  final VoidCallback onRefresh;
 
   const WeatherCard({
     this.weather,
@@ -888,6 +971,8 @@ class WeatherCard extends StatelessWidget {
     required this.isDark,
     required this.statusText,
     required this.statusColor,
+    required this.lastUpdatedText,
+    required this.onRefresh,
     super.key,
   });
 
@@ -910,7 +995,7 @@ class WeatherCard extends StatelessWidget {
     if (isLoading) {
       return Container(
         width: MediaQuery.of(context).size.width * 0.94,
-        height: 150,
+        height: 165,
         margin: const EdgeInsets.symmetric(horizontal: 18),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
@@ -969,7 +1054,7 @@ class WeatherCard extends StatelessWidget {
 
     return Container(
       width: MediaQuery.of(context).size.width * 0.94,
-      height: 150,
+      height: 165,
       margin: const EdgeInsets.symmetric(horizontal: 18),
       clipBehavior: Clip.hardEdge,
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
@@ -989,7 +1074,7 @@ class WeatherCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Location + Risk
+          // Location + Risk + Refresh
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1022,6 +1107,26 @@ class WeatherCard extends StatelessWidget {
                     color: statusColor,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              InkWell(
+                onTap: onRefresh,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.08)
+                        : Colors.green.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.refresh_rounded,
+                    size: 18,
+                    color: isDark ? Colors.white70 : Colors.green.shade700,
                   ),
                 ),
               ),
@@ -1091,6 +1196,27 @@ class WeatherCard extends StatelessWidget {
                 value: '${wind.toStringAsFixed(1)} m/s',
                 isDark: isDark,
                 alignRight: true,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 7),
+
+          Row(
+            children: [
+              Icon(
+                Icons.access_time_rounded,
+                size: 13,
+                color: isDark ? Colors.white38 : Colors.black38,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                lastUpdatedText,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white38 : Colors.black38,
+                ),
               ),
             ],
           ),
