@@ -8,6 +8,32 @@ class ResultPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // =========================
+    // DARK MODE COLORS
+    // =========================
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final Color scaffoldBg =
+        isDark ? const Color(0xFF0B0F14) : const Color(0xFFF8F9FA);
+
+    final Color cardBg =
+        isDark ? const Color(0xFF161B22) : Colors.grey.shade100;
+
+    final Color sectionBg =
+        isDark ? const Color(0xFF161B22) : Colors.grey.shade50;
+
+    final Color mainText =
+        isDark ? Colors.white : Colors.black87;
+
+    final Color subText =
+        isDark ? Colors.white70 : Colors.black87;
+
+    final Color borderColor =
+        isDark ? Colors.white.withOpacity(0.08) : Colors.transparent;
+
+    final Color shadowColor =
+        isDark ? Colors.black.withOpacity(0.28) : Colors.black12;
+
+    // =========================
     // SAFE DATA HANDLING 🔥
     // =========================
     final String disease =
@@ -28,13 +54,28 @@ class ResultPage extends StatelessWidget {
 
     final bool isHighRisk = risk.toLowerCase() == "high";
 
+    final Color riskColor = isHighRisk ? Colors.red : Colors.green;
+
     return Scaffold(
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        title: const Text("Detection Result"),
+        backgroundColor: scaffoldBg,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: mainText),
+        title: Text(
+          "Detection Result",
+          style: TextStyle(
+            color: mainText,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         centerTitle: true,
       ),
 
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         child: Padding(
           padding: const EdgeInsets.all(16),
 
@@ -48,12 +89,14 @@ class ResultPage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [
+                  border: Border.all(color: borderColor),
+                  boxShadow: [
                     BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 8,
+                      color: shadowColor,
+                      blurRadius: 10,
+                      offset: const Offset(0, 6),
                     )
                   ],
                 ),
@@ -70,9 +113,10 @@ class ResultPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             disease,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 19,
                               fontWeight: FontWeight.bold,
+                              color: mainText,
                             ),
                           ),
                         ),
@@ -86,18 +130,26 @@ class ResultPage extends StatelessWidget {
                       children: [
                         const Icon(Icons.track_changes, color: Colors.red),
                         const SizedBox(width: 8),
-                        Text(
-                          "Accuracy: ${accuracy.toStringAsFixed(2)}%",
-                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        Flexible(
+                          child: Text(
+                            "Accuracy: ${accuracy.toStringAsFixed(2)}%",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: subText,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
 
                         const SizedBox(width: 12),
 
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: isHighRisk ? Colors.red : Colors.green,
+                            color: riskColor,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -118,13 +170,13 @@ class ResultPage extends StatelessWidget {
                       children: [
                         Icon(
                           Icons.warning,
-                          color: isHighRisk ? Colors.red : Colors.green,
+                          color: riskColor,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           "$risk Risk Level",
                           style: TextStyle(
-                            color: isHighRisk ? Colors.red : Colors.green,
+                            color: riskColor,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -139,25 +191,31 @@ class ResultPage extends StatelessWidget {
               // =========================
               // 📄 DESCRIPTION
               // =========================
-              const Text(
+              Text(
                 "Description",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
+                  color: mainText,
                 ),
               ),
 
               const SizedBox(height: 10),
 
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
+                  color: sectionBg,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
                 ),
                 child: Text(
                   description,
-                  style: const TextStyle(height: 1.5),
+                  style: TextStyle(
+                    height: 1.5,
+                    color: subText,
+                  ),
                 ),
               ),
 
@@ -166,11 +224,12 @@ class ResultPage extends StatelessWidget {
               // =========================
               // 💊 TREATMENT
               // =========================
-              const Text(
+              Text(
                 "Recommended Treatment",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
+                  color: mainText,
                 ),
               ),
 
@@ -182,13 +241,19 @@ class ResultPage extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.check_circle,
-                          color: Colors.green, size: 18),
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           t.toString(),
-                          style: const TextStyle(height: 1.4),
+                          style: TextStyle(
+                            height: 1.4,
+                            color: subText,
+                          ),
                         ),
                       ),
                     ],
@@ -206,8 +271,14 @@ class ResultPage extends StatelessWidget {
                   Expanded(
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        foregroundColor:
+                            isDark ? Colors.green.shade300 : Colors.green,
+                        side: BorderSide(
+                          color: isDark
+                              ? Colors.green.shade700
+                              : Colors.green,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       onPressed: () => Navigator.pop(context),
                       child: const Text("New Detection"),
@@ -220,8 +291,8 @@ class ResultPage extends StatelessWidget {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       onPressed: () =>
                           Navigator.popUntil(context, (r) => r.isFirst),
