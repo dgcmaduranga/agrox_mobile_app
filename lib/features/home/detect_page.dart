@@ -19,7 +19,9 @@ class _DetectPageState extends State<DetectPage> {
   File? _image;
   Uint8List? webImage;
 
-  String selectedCrop = "rice";
+  // ✅ Default selected crop is Tea
+  String selectedCrop = "tea";
+
   bool isLoading = false;
 
   final picker = ImagePicker();
@@ -157,17 +159,38 @@ class _DetectPageState extends State<DetectPage> {
   // =========================
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final Color scaffoldBg =
+        isDark ? const Color(0xFF0B0F14) : const Color(0xFFF6F8F5);
+
+    final Color cardBg =
+        isDark ? const Color(0xFF161B22) : Colors.white;
+
+    final Color softGreenBg =
+        isDark ? const Color(0xFF102A1A) : const Color(0xFFEAF8E7);
+
+    final Color mainText =
+        isDark ? Colors.white : Colors.black87;
+
+    final Color subText =
+        isDark ? Colors.white60 : Colors.grey.shade600;
+
+    final Color borderColor =
+        isDark ? Colors.green.shade700 : Colors.green.shade300;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8F5),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF6F8F5),
+        backgroundColor: scaffoldBg,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        title: const Text(
+        iconTheme: IconThemeData(color: mainText),
+        title: Text(
           "Detect Disease",
           style: TextStyle(
-            color: Colors.black87,
+            color: mainText,
             fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
@@ -181,13 +204,13 @@ class _DetectPageState extends State<DetectPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Center(
+                Center(
                   child: Text(
                     "Select your leaf type first",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black87,
+                      color: mainText,
                     ),
                   ),
                 ),
@@ -200,7 +223,7 @@ class _DetectPageState extends State<DetectPage> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: subText,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -215,16 +238,19 @@ class _DetectPageState extends State<DetectPage> {
                       crop: "tea",
                       emoji: "🍃",
                       label: "Tea Leaf",
+                      isDark: isDark,
                     ),
                     cropCard(
                       crop: "coconut",
                       emoji: "🥥",
                       label: "Coconut Leaf",
+                      isDark: isDark,
                     ),
                     cropCard(
                       crop: "rice",
                       emoji: "🌾",
                       label: "Rice Leaf",
+                      isDark: isDark,
                     ),
                   ],
                 ),
@@ -238,6 +264,7 @@ class _DetectPageState extends State<DetectPage> {
                         icon: Icons.camera_alt_rounded,
                         label: "Camera",
                         onTap: isLoading ? null : captureImage,
+                        isDark: isDark,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -246,6 +273,7 @@ class _DetectPageState extends State<DetectPage> {
                         icon: Icons.file_upload_outlined,
                         label: "Upload",
                         onTap: isLoading ? null : pickImage,
+                        isDark: isDark,
                       ),
                     ),
                   ],
@@ -253,24 +281,22 @@ class _DetectPageState extends State<DetectPage> {
 
                 const SizedBox(height: 20),
 
-                // =========================
-                // IMAGE PREVIEW BOX
-                // Full image visible fix: BoxFit.contain
-                // =========================
                 Container(
                   height: 245,
                   width: double.infinity,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardBg,
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(
-                      color: Colors.green.shade300,
+                      color: borderColor,
                       width: 1.6,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.green.withOpacity(0.08),
+                        color: isDark
+                            ? Colors.black.withOpacity(0.25)
+                            : Colors.green.withOpacity(0.08),
                         blurRadius: 18,
                         offset: const Offset(0, 8),
                       ),
@@ -281,7 +307,7 @@ class _DetectPageState extends State<DetectPage> {
                     child: Container(
                       width: double.infinity,
                       height: double.infinity,
-                      color: const Color(0xFFEAF8E7),
+                      color: softGreenBg,
                       child: Center(
                         child: (kIsWeb && webImage != null)
                             ? InteractiveViewer(
@@ -312,15 +338,19 @@ class _DetectPageState extends State<DetectPage> {
                                         width: 58,
                                         height: 58,
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
+                                          color: isDark
+                                              ? const Color(0xFF1F2937)
+                                              : Colors.white,
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: Colors.green.shade200,
+                                            color: isDark
+                                                ? Colors.green.shade700
+                                                : Colors.green.shade200,
                                           ),
                                         ),
                                         child: Icon(
                                           Icons.image_outlined,
-                                          color: Colors.green.shade600,
+                                          color: Colors.green.shade500,
                                           size: 30,
                                         ),
                                       ),
@@ -328,7 +358,9 @@ class _DetectPageState extends State<DetectPage> {
                                       Text(
                                         "No image selected",
                                         style: TextStyle(
-                                          color: Colors.grey.shade700,
+                                          color: isDark
+                                              ? Colors.white70
+                                              : Colors.grey.shade700,
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -337,7 +369,9 @@ class _DetectPageState extends State<DetectPage> {
                                       Text(
                                         "Capture or upload a clear leaf image",
                                         style: TextStyle(
-                                          color: Colors.grey.shade500,
+                                          color: isDark
+                                              ? Colors.white38
+                                              : Colors.grey.shade500,
                                           fontSize: 12,
                                         ),
                                       ),
@@ -358,6 +392,8 @@ class _DetectPageState extends State<DetectPage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2ECC4A),
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor:
+                          isDark ? Colors.green.shade900 : Colors.green.shade200,
                       elevation: 6,
                       shadowColor: Colors.green.withOpacity(0.35),
                       shape: RoundedRectangleBorder(
@@ -397,6 +433,7 @@ class _DetectPageState extends State<DetectPage> {
     required IconData icon,
     required String label,
     required VoidCallback? onTap,
+    required bool isDark,
   }) {
     return Material(
       color: Colors.transparent,
@@ -406,15 +443,17 @@ class _DetectPageState extends State<DetectPage> {
         child: Container(
           height: 48,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF161B22) : Colors.white,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: Colors.green.shade300,
+              color: isDark ? Colors.green.shade700 : Colors.green.shade300,
               width: 1.4,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.green.withOpacity(0.08),
+                color: isDark
+                    ? Colors.black.withOpacity(0.22)
+                    : Colors.green.withOpacity(0.08),
                 blurRadius: 12,
                 offset: const Offset(0, 5),
               ),
@@ -425,14 +464,14 @@ class _DetectPageState extends State<DetectPage> {
             children: [
               Icon(
                 icon,
-                color: Colors.green.shade700,
+                color: Colors.green.shade500,
                 size: 20,
               ),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.green.shade800,
+                  color: isDark ? Colors.green.shade300 : Colors.green.shade800,
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                 ),
@@ -451,6 +490,7 @@ class _DetectPageState extends State<DetectPage> {
     required String crop,
     required String emoji,
     required String label,
+    required bool isDark,
   }) {
     final bool selected = selectedCrop == crop;
 
@@ -462,17 +502,21 @@ class _DetectPageState extends State<DetectPage> {
         height: 104,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEAF8E7) : Colors.white,
+          color: selected
+              ? (isDark ? const Color(0xFF102A1A) : const Color(0xFFEAF8E7))
+              : (isDark ? const Color(0xFF161B22) : Colors.white),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? Colors.green : Colors.green.shade200,
+            color: selected
+                ? Colors.green
+                : (isDark ? Colors.green.shade800 : Colors.green.shade200),
             width: selected ? 2 : 1.2,
           ),
           boxShadow: [
             BoxShadow(
               color: selected
-                  ? Colors.green.withOpacity(0.18)
-                  : Colors.black.withOpacity(0.04),
+                  ? Colors.green.withOpacity(isDark ? 0.22 : 0.18)
+                  : Colors.black.withOpacity(isDark ? 0.20 : 0.04),
               blurRadius: selected ? 14 : 8,
               offset: const Offset(0, 6),
             ),
@@ -495,7 +539,9 @@ class _DetectPageState extends State<DetectPage> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: selected ? Colors.green.shade800 : Colors.black87,
+                      color: selected
+                          ? Colors.green.shade400
+                          : (isDark ? Colors.white70 : Colors.black87),
                     ),
                   ),
                 ],
@@ -508,7 +554,7 @@ class _DetectPageState extends State<DetectPage> {
                 bottom: 0,
                 child: Icon(
                   Icons.check_circle,
-                  color: Colors.green.shade600,
+                  color: Colors.green.shade500,
                   size: 18,
                 ),
               ),
