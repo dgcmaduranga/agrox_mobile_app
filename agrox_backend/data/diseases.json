@@ -4,7 +4,7 @@
     "name": "Algal Spot",
     "crop": "tea",
     "image": "assets/images/diseases/tea/algal_spot.jpg",
-    "description": "Algal Spot, also known as Red Rust, is common in tea-growing areas with high humidity, frequent mist, shade, and wet leaf surfaces. It forms orange to green patches on tea leaves and reduces photosynthesis and leaf quality.",
+    "description": "Algal Spot, also known as Red Rust, is common in Sri Lankan tea-growing areas with high humidity, mist, shade, and wet leaf surfaces. It forms orange to green patches on tea leaves and reduces photosynthesis and leaf quality.",
     "symptoms": [
       "Orange or green circular spots on leaves",
       "Rough raised patches",
@@ -42,9 +42,9 @@
       "Monitor fields after rainy days"
     ],
     "riskConditions": {
-      "minTemp": 22,
+      "minTemp": 23,
       "maxTemp": 30,
-      "minHumidity": 82,
+      "minHumidity": 84,
       "rainRequired": true
     }
   },
@@ -53,7 +53,7 @@
     "name": "Brown Blight",
     "crop": "tea",
     "image": "assets/images/diseases/tea/brown_blight.jpg",
-    "description": "Brown Blight is a fungal tea leaf disease that develops quickly under warm and humid conditions. It causes brown lesions, leaf drying, and poor leaf quality.",
+    "description": "Brown Blight is a fungal tea leaf disease that develops quickly under warm and humid wet-zone conditions. It causes brown lesions, leaf drying, and poor leaf quality.",
     "symptoms": [
       "Brown spots on leaves",
       "Leaf drying",
@@ -91,9 +91,9 @@
       "Monitor during wet weather"
     ],
     "riskConditions": {
-      "minTemp": 23,
+      "minTemp": 24,
       "maxTemp": 31,
-      "minHumidity": 80,
+      "minHumidity": 82,
       "rainRequired": true
     }
   },
@@ -102,7 +102,7 @@
     "name": "Gray Blight",
     "crop": "tea",
     "image": "assets/images/diseases/tea/gray_blight.jpg",
-    "description": "Gray Blight causes grayish brown lesions on tea leaves. It is common when humidity is high, rainfall is frequent, and leaves remain wet for long periods.",
+    "description": "Gray Blight causes grayish brown lesions on tea leaves. It is common when humidity is very high, rainfall is frequent, and leaves remain wet for long periods.",
     "symptoms": [
       "Gray or brown leaf spots",
       "Leaf discoloration",
@@ -112,7 +112,7 @@
     ],
     "causes": [
       "Fungal infection",
-      "High humidity",
+      "Very high humidity",
       "Frequent rainfall",
       "Poor drainage",
       "Wet leaf surface"
@@ -141,8 +141,8 @@
     ],
     "riskConditions": {
       "minTemp": 22,
-      "maxTemp": 30,
-      "minHumidity": 85,
+      "maxTemp": 29,
+      "minHumidity": 88,
       "rainRequired": true
     }
   },
@@ -187,9 +187,9 @@
       "Maintain field hygiene"
     ],
     "riskConditions": {
-      "minTemp": 28,
-      "maxTemp": 34,
-      "minHumidity": 65,
+      "minTemp": 30,
+      "maxTemp": 35,
+      "minHumidity": 70,
       "rainRequired": false
     }
   },
@@ -234,9 +234,9 @@
       "Monitor during wet periods"
     ],
     "riskConditions": {
-      "minTemp": 23,
+      "minTemp": 24,
       "maxTemp": 31,
-      "minHumidity": 80,
+      "minHumidity": 83,
       "rainRequired": true
     }
   },
@@ -283,9 +283,9 @@
       "Use resistant varieties"
     ],
     "riskConditions": {
-      "minTemp": 25,
+      "minTemp": 26,
       "maxTemp": 34,
-      "minHumidity": 82,
+      "minHumidity": 84,
       "rainRequired": true
     }
   },
@@ -332,9 +332,9 @@
       "Avoid plant stress"
     ],
     "riskConditions": {
-      "minTemp": 28,
-      "maxTemp": 32,
-      "minHumidity": 75,
+      "minTemp": 29,
+      "maxTemp": 33,
+      "minHumidity": 80,
       "rainRequired": false
     }
   },
@@ -382,8 +382,8 @@
     ],
     "riskConditions": {
       "minTemp": 22,
-      "maxTemp": 30,
-      "minHumidity": 86,
+      "maxTemp": 29,
+      "minHumidity": 88,
       "rainRequired": true
     }
   },
@@ -428,9 +428,9 @@
       "Improve field hygiene"
     ],
     "riskConditions": {
-      "minTemp": 28,
-      "maxTemp": 34,
-      "minHumidity": 75,
+      "minTemp": 30,
+      "maxTemp": 35,
+      "minHumidity": 78,
       "rainRequired": false
     }
   },
@@ -478,9 +478,9 @@
       "Avoid continuous rice cultivation"
     ],
     "riskConditions": {
-      "minTemp": 28,
-      "maxTemp": 34,
-      "minHumidity": 70,
+      "minTemp": 30,
+      "maxTemp": 35,
+      "minHumidity": 72,
       "rainRequired": false
     }
   },
@@ -526,9 +526,9 @@
       "Control insect vectors"
     ],
     "riskConditions": {
-      "minTemp": 28,
-      "maxTemp": 35,
-      "minHumidity": 62,
+      "minTemp": 30,
+      "maxTemp": 36,
+      "minHumidity": 68,
       "rainRequired": false
     }
   },
@@ -573,9 +573,9 @@
       "Monitor vector insects"
     ],
     "riskConditions": {
-      "minTemp": 28,
-      "maxTemp": 34,
-      "minHumidity": 65,
+      "minTemp": 31,
+      "maxTemp": 35,
+      "minHumidity": 70,
       "rainRequired": false
     }
   },
@@ -621,9 +621,9 @@
       "Avoid movement of infected seedlings"
     ],
     "riskConditions": {
-      "minTemp": 28,
-      "maxTemp": 34,
-      "minHumidity": 65,
+      "minTemp": 30,
+      "maxTemp": 35,
+      "minHumidity": 72,
       "rainRequired": false
     }
   },
@@ -669,9 +669,9 @@
       "Inspect nearby palms"
     ],
     "riskConditions": {
-      "minTemp": 29,
-      "maxTemp": 35,
-      "minHumidity": 60,
+      "minTemp": 32,
+      "maxTemp": 36,
+      "minHumidity": 65,
       "rainRequired": false
     }
   },
@@ -717,9 +717,9 @@
       "Avoid spread from nearby palms"
     ],
     "riskConditions": {
-      "minTemp": 29,
-      "maxTemp": 34,
-      "minHumidity": 60,
+      "minTemp": 31,
+      "maxTemp": 35,
+      "minHumidity": 68,
       "rainRequired": false
     }
   }

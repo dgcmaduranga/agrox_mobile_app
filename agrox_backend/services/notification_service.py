@@ -79,7 +79,6 @@ def _format_percent(risk_percent: Optional[Any]) -> str:
     try:
         value = float(risk_percent)
 
-        # If frontend/backend sends ratio like 0.67, convert to 67%.
         if 0 < value <= 1:
             value = value * 100
 
@@ -125,6 +124,36 @@ def _extract_risk_percent_value(risk: Dict[str, Any]) -> float:
         return 0.0
 
 
+def _extract_disease_name(risk: Dict[str, Any]) -> str:
+    return (
+        risk.get("disease_name")
+        or risk.get("diseaseName")
+        or risk.get("name")
+        or risk.get("disease")
+        or "Disease Risk"
+    )
+
+
+def _extract_risk_level(risk: Dict[str, Any]) -> str:
+    return (
+        risk.get("risk_level")
+        or risk.get("riskLevel")
+        or risk.get("severity")
+        or "Low"
+    )
+
+
+def _sort_risks(risks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return sorted(
+        risks,
+        key=lambda item: (
+            _risk_sort_value(item),
+            _extract_risk_percent_value(item),
+        ),
+        reverse=True,
+    )
+
+
 # =====================================================
 # Send Notification to One Device
 # =====================================================
@@ -137,7 +166,6 @@ def send_push_notification(
 ) -> Dict[str, Any]:
     """
     Send Firebase Cloud Messaging notification to one device token.
-    Works when app is foreground, background, or closed depending on device settings.
     """
     try:
         init_firebase_admin()
@@ -272,6 +300,7 @@ def send_multiple_risk_alerts(
     """
     Send separate notifications for each high / medium crop risk.
     Low risks are skipped.
+    High risks are sent first, then medium risks.
     """
     try:
         token = _safe_text(token, "")
@@ -288,36 +317,15 @@ def send_multiple_risk_alerts(
                 "message": "No risks found",
             }
 
-        sorted_risks = sorted(
-            risks,
-            key=lambda item: (
-                _risk_sort_value(item),
-                _extract_risk_percent_value(item),
-            ),
-            reverse=True,
-        )
+        sorted_risks = _sort_risks(risks)
 
         sent_results = []
         skipped_results = []
 
         for risk in sorted_risks:
             crop = risk.get("crop", "Crop")
-
-            disease_name = (
-                risk.get("disease_name")
-                or risk.get("diseaseName")
-                or risk.get("name")
-                or risk.get("disease")
-                or "Disease Risk"
-            )
-
-            risk_level = (
-                risk.get("risk_level")
-                or risk.get("riskLevel")
-                or risk.get("severity")
-                or "Low"
-            )
-
+            disease_name = _extract_disease_name(risk)
+            risk_level = _extract_risk_level(risk)
             severity = risk.get("severity", risk_level)
 
             risk_percent = (
@@ -334,6 +342,7 @@ def send_multiple_risk_alerts(
                     "crop": crop,
                     "disease_name": disease_name,
                     "risk_level": normalized_level,
+                    "risk_percent": _format_percent(risk_percent),
                     "message": "Low risk skipped",
                 })
                 continue
@@ -529,6 +538,7 @@ def send_multiple_risk_alerts_to_multiple_devices(
     """
     Send separate high / medium risk alerts to multiple devices.
     Low risks are skipped.
+    High risks are sent first, then medium risks.
     """
     try:
         valid_tokens = [str(t).strip() for t in tokens if str(t).strip()]
@@ -545,36 +555,15 @@ def send_multiple_risk_alerts_to_multiple_devices(
                 "message": "No risks found",
             }
 
-        sorted_risks = sorted(
-            risks,
-            key=lambda item: (
-                _risk_sort_value(item),
-                _extract_risk_percent_value(item),
-            ),
-            reverse=True,
-        )
+        sorted_risks = _sort_risks(risks)
 
         sent_results = []
         skipped_results = []
 
         for risk in sorted_risks:
             crop = risk.get("crop", "Crop")
-
-            disease_name = (
-                risk.get("disease_name")
-                or risk.get("diseaseName")
-                or risk.get("name")
-                or risk.get("disease")
-                or "Disease Risk"
-            )
-
-            risk_level = (
-                risk.get("risk_level")
-                or risk.get("riskLevel")
-                or risk.get("severity")
-                or "Low"
-            )
-
+            disease_name = _extract_disease_name(risk)
+            risk_level = _extract_risk_level(risk)
             severity = risk.get("severity", risk_level)
 
             risk_percent = (
@@ -591,6 +580,7 @@ def send_multiple_risk_alerts_to_multiple_devices(
                     "crop": crop,
                     "disease_name": disease_name,
                     "risk_level": normalized_level,
+                    "risk_percent": _format_percent(risk_percent),
                     "message": "Low risk skipped",
                 })
                 continue

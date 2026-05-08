@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 class TranslateService {
   // Update baseUrl to point to your backend translate endpoint.
   // Keep as local host for development or change to production URL.
-  static const String baseUrl = "http://192.168.8.125:8000";
+  static const String baseUrl = "http://127.0.0.1:8000";
 
   // Simple in-memory cache to avoid duplicate requests.
   static final Map<String, String> _cache = {};

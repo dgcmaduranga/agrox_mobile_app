@@ -1,26 +1,32 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
 
 // 🔥 ADD
 import 'app_config.dart';
 
 class ApiService {
-  static const String baseUrl = "http://192.168.8.125:8000";
+  static const String baseUrl = "http://127.0.0.1:8000";
 
   // =========================
   // MOBILE
   // =========================
   static Future<Map<String, dynamic>?> detectDisease(
-      File image, String crop) async {
+    File image,
+    String crop,
+  ) async {
     try {
-      var uri = Uri.parse("$baseUrl/detect");
+      final uri = Uri.parse("$baseUrl/detect");
 
-      var request = http.MultipartRequest("POST", uri);
+      final request = http.MultipartRequest("POST", uri);
 
       request.files.add(
-        await http.MultipartFile.fromPath("file", image.path),
+        await http.MultipartFile.fromPath(
+          "file",
+          image.path,
+        ),
       );
 
       request.fields["crop"] = crop;
@@ -28,20 +34,43 @@ class ApiService {
       // 🔥 ADD LANGUAGE
       request.fields["lang"] = AppConfig.lang;
 
-      var response = await request.send();
+      final response = await request.send();
 
-      var resBody = await response.stream.bytesToString();
-      final data = jsonDecode(resBody);
+      final resBody = await response.stream.bytesToString();
 
-      if (data["status"] == "success") {
-        return data;
-      } else {
-        print("API ERROR: ${data["message"]}");
-        return null;
+      print("DETECT STATUS: ${response.statusCode}");
+      print("DETECT BODY: $resBody");
+
+      if (resBody.isEmpty) {
+        return {
+          "status": "failed",
+          "prediction": "unknown",
+          "reason": "empty_response",
+          "message": "Detection could not be completed. Please try again",
+        };
       }
+
+      final decoded = jsonDecode(resBody);
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+
+      return {
+        "status": "failed",
+        "prediction": "unknown",
+        "reason": "invalid_response",
+        "message": "Detection could not be completed. Please try again",
+      };
     } catch (e) {
       print("ERROR: $e");
-      return null;
+
+      return {
+        "status": "failed",
+        "prediction": "unknown",
+        "reason": "connection_error",
+        "message": "Connection failed. Please try again later",
+      };
     }
   }
 
@@ -49,11 +78,13 @@ class ApiService {
   // WEB
   // =========================
   static Future<Map<String, dynamic>?> detectDiseaseWeb(
-      Uint8List imageBytes, String crop) async {
+    Uint8List imageBytes,
+    String crop,
+  ) async {
     try {
-      var uri = Uri.parse("$baseUrl/detect");
+      final uri = Uri.parse("$baseUrl/detect");
 
-      var request = http.MultipartRequest("POST", uri);
+      final request = http.MultipartRequest("POST", uri);
 
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -68,31 +99,54 @@ class ApiService {
       // 🔥 ADD LANGUAGE
       request.fields["lang"] = AppConfig.lang;
 
-      var response = await request.send();
+      final response = await request.send();
 
-      var resBody = await response.stream.bytesToString();
-      final data = jsonDecode(resBody);
+      final resBody = await response.stream.bytesToString();
 
-      if (data["status"] == "success") {
-        return data;
-      } else {
-        print("API ERROR: ${data["message"]}");
-        return null;
+      print("WEB DETECT STATUS: ${response.statusCode}");
+      print("WEB DETECT BODY: $resBody");
+
+      if (resBody.isEmpty) {
+        return {
+          "status": "failed",
+          "prediction": "unknown",
+          "reason": "empty_response",
+          "message": "Detection could not be completed. Please try again",
+        };
       }
+
+      final decoded = jsonDecode(resBody);
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+
+      return {
+        "status": "failed",
+        "prediction": "unknown",
+        "reason": "invalid_response",
+        "message": "Detection could not be completed. Please try again",
+      };
     } catch (e) {
       print("WEB ERROR: $e");
-      return null;
+
+      return {
+        "status": "failed",
+        "prediction": "unknown",
+        "reason": "connection_error",
+        "message": "Connection failed. Please try again later",
+      };
     }
   }
 
   // =========================
-  // CHATBOT (UPDATED 🔥)
+  // CHATBOT
   // =========================
   static Future<String> askAI(String question) async {
     try {
-      var uri = Uri.parse("$baseUrl/chat");
+      final uri = Uri.parse("$baseUrl/chat");
 
-      var response = await http.post(
+      final response = await http.post(
         uri,
         headers: {
           "Content-Type": "application/json",
@@ -105,6 +159,10 @@ class ApiService {
         }),
       );
 
+      if (response.body.isEmpty) {
+        return "No response from AI";
+      }
+
       final data = jsonDecode(response.body);
 
       if (data["response"] != null) {
@@ -114,7 +172,7 @@ class ApiService {
       }
     } catch (e) {
       print("CHAT ERROR: $e");
-      return "Error connecting to AI";
+      return "Unable to connect. Please try again later";
     }
   }
 }

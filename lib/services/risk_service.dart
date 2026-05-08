@@ -1,14 +1,18 @@
 import '../models/disease_model.dart';
 
 class RiskService {
-  /// Compute percentage-based risk per disease.
-  /// Conditions used:
-  /// temperature, humidity, and rain only when rainRequired is true.
+  /// Weather risk calculate කරන main function එක.
+  ///
+  /// rainRequired = true නම්:
+  ///   temperature + humidity + rain = 3 conditions
+  ///
+  /// rainRequired = false නම්:
+  ///   temperature + humidity = 2 conditions
   ///
   /// Severity:
-  /// 100% match = high
-  /// 60% or above = medium
-  /// below 60% = low
+  ///   100% match       -> high
+  ///   60% and above    -> medium
+  ///   below 60%        -> low
   static List<Disease> compute(
     List<Disease> diseases,
     double? temp,
@@ -21,12 +25,9 @@ class RiskService {
     final List<Disease> listToProcess =
         (selectedCrop != null && selectedCrop.trim().isNotEmpty)
             ? diseases.where((d) {
-                final crop = d.crop.toString().toLowerCase().trim();
-                final selected = selectedCrop.toLowerCase().trim();
-
-                return crop == selected ||
-                    (selected == 'paddy' && crop == 'rice') ||
-                    (selected == 'rice' && crop == 'paddy');
+                final crop = _normalizeCrop(d.crop);
+                final selected = _normalizeCrop(selectedCrop);
+                return crop == selected;
               }).toList()
             : diseases;
 
@@ -41,27 +42,30 @@ class RiskService {
       int totalConditions = 0;
       int matched = 0;
 
+      // Temperature condition
       if (minT != null && maxT != null && temp != null) {
-        totalConditions += 1;
+        totalConditions++;
 
         if (temp >= minT && temp <= maxT) {
-          matched += 1;
+          matched++;
         }
       }
 
+      // Humidity condition
       if (minH != null && humidity != null) {
-        totalConditions += 1;
+        totalConditions++;
 
         if (humidity >= minH) {
-          matched += 1;
+          matched++;
         }
       }
 
+      // Rain condition only when required
       if (rainReq) {
-        totalConditions += 1;
+        totalConditions++;
 
         if (hasRain) {
-          matched += 1;
+          matched++;
         }
       }
 
@@ -77,10 +81,6 @@ class RiskService {
       );
 
       copy.score = matched;
-
-      // Stored as ratio:
-      // 1.0 = 100%
-      // 0.67 = 67%
       copy.percent = percent;
 
       if (percent >= 1.0) {
@@ -99,13 +99,14 @@ class RiskService {
     return out;
   }
 
-  /// Select top N diseases, one per crop.
+  /// Crop 3කට top risk 3ක් විතරක් return කරන function එක.
   ///
-  /// Used by home weather risk alert.
   /// Example:
-  /// Coconut -> top coconut risk
-  /// Tea -> top tea risk
-  /// Rice -> top rice risk
+  ///   Rice    -> best matching rice disease
+  ///   Tea     -> best matching tea disease
+  ///   Coconut -> best matching coconut disease
+  ///
+  /// හැම crop එකකටම high/medium නැතත්, best low එකක් හරි return වෙනවා.
   static List<Disease> selectTopPerCrop(
     List<Disease> diseases,
     double? temp,
@@ -150,6 +151,7 @@ class RiskService {
       }
     }
 
+    // User/home page crop order එක අනුව add කරනවා.
     if (cropOrder != null && cropOrder.isNotEmpty) {
       for (final crop in cropOrder) {
         if (result.length >= limit) break;
@@ -157,6 +159,7 @@ class RiskService {
       }
     }
 
+    // cropOrder එකේ නැති crop තියෙනවා නම් ඒවගෙන් top risks add කරනවා.
     if (result.length < limit) {
       final List<Disease> remainingTop = [];
 
@@ -180,6 +183,12 @@ class RiskService {
       }
     }
 
+    result.sort((a, b) {
+      final cropCmp = _cropRank(a.crop).compareTo(_cropRank(b.crop));
+      if (cropCmp != 0) return cropCmp;
+      return _riskSorter(a, b);
+    });
+
     if (result.length > limit) {
       return result.sublist(0, limit);
     }
@@ -187,7 +196,9 @@ class RiskService {
     return result;
   }
 
-  /// Return only high and medium risks for notification page.
+  /// Notification page එකට high සහ medium alerts විතරක් අවශ්‍ය නම් මේක use කරන්න.
+  /// නමුත් ඔයාගේ current requirement එකේ low එකත් page එකේ පෙන්වන්න ඕන නම්,
+  /// HomePage එකෙන් activeAlertsOnly call කරන්න එපා.
   static List<Disease> activeAlertsOnly(List<Disease> diseases) {
     final alerts = diseases.where((d) => isMediumOrHigh(d.severity)).toList();
 
@@ -196,8 +207,8 @@ class RiskService {
     return alerts;
   }
 
-  /// For notification: choose the strongest high/medium disease.
-  /// Returns null when all risks are low.
+  /// High/Medium අතරින් strongest එක.
+  /// Low විතරක් තියෙනවා නම් null return වෙනවා.
   static Disease? topRiskForNotification(List<Disease> diseases) {
     final risky = diseases.where((d) => isMediumOrHigh(d.severity)).toList();
 
@@ -208,8 +219,8 @@ class RiskService {
     return risky.first;
   }
 
-  /// For notification: choose strongest high/medium disease per crop.
-  /// This supports sending separate notifications for tea/rice/coconut.
+  /// Phone notification වලට crop එකකට එක high/medium disease එකක් ගන්න.
+  /// Low risks notification යවන්නේ නෑ.
   static List<Disease> topRisksForNotificationPerCrop(
     List<Disease> diseases,
   ) {
@@ -238,7 +249,6 @@ class RiskService {
     return result;
   }
 
-  /// Check whether disease severity should trigger notification.
   static bool isMediumOrHigh(String? severity) {
     final s = (severity ?? '').toLowerCase();
 
@@ -248,11 +258,6 @@ class RiskService {
         s.contains('moderate');
   }
 
-  /// Severity ranking helper.
-  /// high/severe = 3
-  /// medium/moderate = 2
-  /// low = 1
-  /// unknown = 0
   static int severityRank(String? severity) {
     final s = (severity ?? '').toLowerCase();
 
@@ -263,7 +268,6 @@ class RiskService {
     return 0;
   }
 
-  /// Human-readable risk title for notification/UI.
   static String displayRiskLevel(String? severity) {
     final s = (severity ?? '').toLowerCase();
 
@@ -278,7 +282,6 @@ class RiskService {
     return 'Low Risk';
   }
 
-  /// Human-readable severity badge.
   static String displaySeverity(String? severity) {
     final s = (severity ?? '').toLowerCase();
 
@@ -288,11 +291,10 @@ class RiskService {
     return 'Low';
   }
 
-  /// Display risk percent correctly.
-  /// Disease.percent is stored as 0.0 - 1.0.
-  /// Example:
-  /// 1.0 -> 100%
+  /// Disease.percent save වෙන්නේ 0.0 - 1.0 ratio එකක් විදිහට.
+  /// 1.0  -> 100%
   /// 0.67 -> 67%
+  /// 0.5  -> 50%
   static String displayPercent(Disease disease) {
     final value = disease.percent;
 
@@ -303,11 +305,12 @@ class RiskService {
     return '${percentage.toStringAsFixed(0)}%';
   }
 
-  /// Risk sorting.
-  /// 1. Severity
-  /// 2. Percent
-  /// 3. Score
-  /// 4. Name
+  /// Risk order:
+  ///   1. High / Medium / Low
+  ///   2. Higher percent
+  ///   3. Higher matched score
+  ///   4. Crop order: Rice, Tea, Coconut
+  ///   5. Name
   static int _riskSorter(Disease a, Disease b) {
     final severityCmp = severityRank(b.severity).compareTo(
       severityRank(a.severity),
@@ -321,7 +324,20 @@ class RiskService {
     final scoreCmp = b.score.compareTo(a.score);
     if (scoreCmp != 0) return scoreCmp;
 
+    final cropCmp = _cropRank(a.crop).compareTo(_cropRank(b.crop));
+    if (cropCmp != 0) return cropCmp;
+
     return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  }
+
+  static int _cropRank(String? crop) {
+    final c = _normalizeCrop(crop);
+
+    if (c == 'rice') return 1;
+    if (c == 'tea') return 2;
+    if (c == 'coconut') return 3;
+
+    return 99;
   }
 
   static String _normalizeCrop(String? crop) {

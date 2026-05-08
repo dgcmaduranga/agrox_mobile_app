@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/saved_treatment_service.dart';
+import '../../widgests/translated_text.dart';
 
 class ResultPage extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -10,6 +11,7 @@ class ResultPage extends StatelessWidget {
   Future<void> _saveTreatment({
     required BuildContext context,
     required String disease,
+    required String crop,
     required String risk,
     required String description,
     required List<dynamic> treatment,
@@ -21,7 +23,7 @@ class ResultPage extends StatelessWidget {
 
       await SavedTreatmentService.saveTreatment(
         diseaseName: disease,
-        crop: data["crop"]?.toString() ?? data["selectedCrop"]?.toString() ?? "Unknown Crop",
+        crop: crop,
         riskLevel: risk,
         description: description,
         treatments: treatmentList,
@@ -31,8 +33,8 @@ class ResultPage extends StatelessWidget {
       if (!context.mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("✅ Treatment saved successfully"),
+        SnackBar(
+          content: TranslatedText("✅ Treatment saved successfully"),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -41,18 +43,47 @@ class ResultPage extends StatelessWidget {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("❌ Failed to save treatment: $e"),
+          content: TranslatedText("❌ Failed to save treatment"),
           behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
 
+  Color _riskColor(String risk) {
+    final r = risk.toLowerCase();
+
+    if (r.contains('high')) return Colors.red;
+    if (r.contains('medium') || r.contains('moderate')) return Colors.orange;
+
+    return Colors.green;
+  }
+
+  String _formatCrop(String crop) {
+    final c = crop.toLowerCase().trim();
+
+    if (c == "tea") return "Tea Leaf";
+    if (c == "coconut") return "Coconut Leaf";
+    if (c == "rice") return "Rice Leaf";
+
+    return crop.isNotEmpty ? crop : "Unknown Crop";
+  }
+
+  double _safeAccuracy(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? "0") ?? 0.0;
+  }
+
+  List<dynamic> _safeTreatment(dynamic value) {
+    if (value is List && value.isNotEmpty) {
+      return value;
+    }
+
+    return ["No recommendations available"];
+  }
+
   @override
   Widget build(BuildContext context) {
-    // =========================
-    // DARK MODE COLORS
-    // =========================
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     final Color scaffoldBg =
@@ -63,6 +94,8 @@ class ResultPage extends StatelessWidget {
 
     final Color sectionBg =
         isDark ? const Color(0xFF161B22) : Colors.grey.shade50;
+
+    final Color bottomBg = isDark ? const Color(0xFF0B0F14) : Colors.white;
 
     final Color mainText = isDark ? Colors.white : Colors.black87;
 
@@ -75,26 +108,34 @@ class ResultPage extends StatelessWidget {
         isDark ? Colors.black.withOpacity(0.28) : Colors.black12;
 
     // =========================
-    // SAFE DATA HANDLING 🔥
+    // SAFE DATA
     // =========================
-    final String disease = data["disease"]?.toString() ?? "Unknown Disease";
+    final String disease =
+        data["disease"]?.toString().trim().isNotEmpty == true
+            ? data["disease"].toString()
+            : "Unknown Disease";
 
-    final double accuracy =
-        (data["accuracy"] is num) ? (data["accuracy"] as num).toDouble() : 0.0;
+    final String cropRaw =
+        data["crop"]?.toString() ??
+        data["selectedCrop"]?.toString() ??
+        "Unknown Crop";
 
-    final String risk = data["risk"]?.toString() ?? "Low";
+    final String crop = _formatCrop(cropRaw);
+
+    final double accuracy = _safeAccuracy(data["accuracy"]);
+
+    final String risk = data["risk"]?.toString().trim().isNotEmpty == true
+        ? data["risk"].toString()
+        : "Low";
 
     final String description =
-        data["description"]?.toString() ?? "No detailed data found.";
+        data["description"]?.toString().trim().isNotEmpty == true
+            ? data["description"].toString()
+            : "No detailed data found.";
 
-    final List<dynamic> treatment =
-        (data["treatment"] is List && data["treatment"].isNotEmpty)
-            ? data["treatment"]
-            : ["No recommendations available"];
+    final List<dynamic> treatment = _safeTreatment(data["treatment"]);
 
-    final bool isHighRisk = risk.toLowerCase() == "high";
-
-    final Color riskColor = isHighRisk ? Colors.red : Colors.green;
+    final Color riskColor = _riskColor(risk);
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -116,7 +157,7 @@ class ResultPage extends StatelessWidget {
             );
           },
         ),
-        title: Text(
+        title: TranslatedText(
           "Detection Result",
           style: TextStyle(
             color: mainText,
@@ -127,16 +168,19 @@ class ResultPage extends StatelessWidget {
         centerTitle: true,
       ),
 
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-
+      // =========================
+      // BODY ONLY SCROLLS
+      // =========================
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // =========================
-              // 🔥 RESULT CARD
+              // RESULT CARD
               // =========================
               Container(
                 padding: const EdgeInsets.all(18),
@@ -149,20 +193,22 @@ class ResultPage extends StatelessWidget {
                       color: shadowColor,
                       blurRadius: 10,
                       offset: const Offset(0, 6),
-                    )
+                    ),
                   ],
                 ),
-
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // DISEASE
+                    // Disease name
                     Row(
                       children: [
-                        const Icon(Icons.bug_report, color: Colors.purple),
+                        const Icon(
+                          Icons.bug_report,
+                          color: Colors.purple,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
+                          child: TranslatedText(
                             disease,
                             style: TextStyle(
                               fontSize: 19,
@@ -176,13 +222,39 @@ class ResultPage extends StatelessWidget {
 
                     const SizedBox(height: 14),
 
-                    // ACCURACY + RISK
+                    // Crop
                     Row(
                       children: [
-                        const Icon(Icons.track_changes, color: Colors.red),
+                        const Icon(
+                          Icons.eco,
+                          color: Colors.green,
+                        ),
                         const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
+                        Expanded(
+                          child: TranslatedText(
+                            "Crop: $crop",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: subText,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Accuracy + Risk
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.track_changes,
+                          color: Colors.red,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TranslatedText(
                             "Accuracy: ${accuracy.toStringAsFixed(2)}%",
                             style: TextStyle(
                               fontWeight: FontWeight.w500,
@@ -191,9 +263,7 @@ class ResultPage extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-
                         const SizedBox(width: 12),
-
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -203,20 +273,19 @@ class ResultPage extends StatelessWidget {
                             color: riskColor,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Text(
+                          child: TranslatedText(
                             risk,
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                        )
+                        ),
                       ],
                     ),
 
                     const SizedBox(height: 12),
 
-                    // RISK TEXT
                     Row(
                       children: [
                         Icon(
@@ -224,7 +293,7 @@ class ResultPage extends StatelessWidget {
                           color: riskColor,
                         ),
                         const SizedBox(width: 8),
-                        Text(
+                        TranslatedText(
                           "$risk Risk Level",
                           style: TextStyle(
                             color: riskColor,
@@ -237,12 +306,12 @@ class ResultPage extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 24),
 
               // =========================
-              // 📄 DESCRIPTION
+              // DESCRIPTION
               // =========================
-              Text(
+              TranslatedText(
                 "Description",
                 style: TextStyle(
                   fontSize: 18,
@@ -261,21 +330,23 @@ class ResultPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: borderColor),
                 ),
-                child: Text(
+                child: TranslatedText(
                   description,
                   style: TextStyle(
                     height: 1.5,
                     color: subText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 24),
 
               // =========================
-              // 💊 TREATMENT
+              // TREATMENT
               // =========================
-              Text(
+              TranslatedText(
                 "Recommended Treatment",
                 style: TextStyle(
                   fontSize: 18,
@@ -284,26 +355,31 @@ class ResultPage extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
               ...treatment.map<Widget>((t) {
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.only(bottom: 10),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 18,
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 18,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
+                        child: TranslatedText(
                           t.toString(),
                           style: TextStyle(
                             height: 1.4,
                             color: subText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -312,52 +388,86 @@ class ResultPage extends StatelessWidget {
                 );
               }).toList(),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
 
-              // =========================
-              // 🔘 BUTTONS
-              // =========================
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor:
-                            isDark ? Colors.green.shade300 : Colors.green,
-                        side: BorderSide(
-                          color:
-                              isDark ? Colors.green.shade700 : Colors.green,
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("New Detection"),
+      // =========================
+      // FIXED BOTTOM BUTTONS
+      // =========================
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          decoration: BoxDecoration(
+            color: bottomBg,
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withOpacity(0.35)
+                    : Colors.black.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor:
+                        isDark ? Colors.green.shade300 : Colors.green,
+                    side: BorderSide(
+                      color: isDark ? Colors.green.shade700 : Colors.green,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-
-                  const SizedBox(width: 12),
-
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: () {
-                        _saveTreatment(
-                          context: context,
-                          disease: disease,
-                          risk: risk,
-                          description: description,
-                          treatment: treatment,
-                          accuracy: accuracy,
-                        );
-                      },
-                      child: const Text("Save Treatment"),
+                  onPressed: () => Navigator.pop(context),
+                  child: TranslatedText(
+                    "New Detection",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  onPressed: () {
+                    _saveTreatment(
+                      context: context,
+                      disease: disease,
+                      crop: crop,
+                      risk: risk,
+                      description: description,
+                      treatment: treatment,
+                      accuracy: accuracy,
+                    );
+                  },
+                  child: TranslatedText(
+                    "Save Treatment",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

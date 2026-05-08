@@ -80,11 +80,13 @@ class NotificationService {
 
     debugPrint('Notification permission: ${settings.authorizationStatus}');
 
-    await _messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    if (!kIsWeb) {
+      await _messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
   }
 
   // =========================
@@ -213,8 +215,9 @@ class NotificationService {
       final String risk = riskLevel.toLowerCase();
       final String sev = severity.toLowerCase();
 
-      final bool isHigh =
-          risk.contains('high') || sev.contains('high') || sev.contains('severe');
+      final bool isHigh = risk.contains('high') ||
+          sev.contains('high') ||
+          sev.contains('severe');
 
       final bool isMedium = risk.contains('medium') ||
           sev.contains('medium') ||
@@ -228,20 +231,16 @@ class NotificationService {
       final String levelText = isHigh ? 'High' : 'Medium';
 
       final String cropText = _formatText(crop, fallback: 'Crop');
-      final String diseaseText = _formatText(diseaseName, fallback: 'Disease');
+      final String diseaseText = _formatText(
+        diseaseName,
+        fallback: 'Disease Risk',
+      );
 
       final String title = isHigh
           ? '⚠️ High Disease Risk Alert'
           : '⚠️ Medium Disease Risk Alert';
 
-      String percentText = '';
-
-      if (riskPercent != null && riskPercent > 0) {
-        final double displayPercent =
-            riskPercent <= 1 ? riskPercent * 100 : riskPercent;
-
-        percentText = ' (${displayPercent.toStringAsFixed(0)}%)';
-      }
+      final String percentText = _formatPercentText(riskPercent);
 
       final String body =
           '$cropText: $diseaseText risk is $levelText$percentText. Please check AgroX.';
@@ -276,29 +275,33 @@ class NotificationService {
   Future<void> showMultipleRiskNotifications({
     required List<Map<String, dynamic>> risks,
   }) async {
-    for (final risk in risks) {
-      final crop = risk['crop']?.toString() ?? 'Crop';
+    try {
+      for (final risk in risks) {
+        final crop = risk['crop']?.toString() ?? 'Crop';
 
-      final diseaseName = risk['name']?.toString() ??
-          risk['disease']?.toString() ??
-          risk['diseaseName']?.toString() ??
-          'Disease';
+        final diseaseName = risk['name']?.toString() ??
+            risk['disease']?.toString() ??
+            risk['diseaseName']?.toString() ??
+            'Disease Risk';
 
-      final severity = risk['severity']?.toString() ?? 'Low';
+        final severity = risk['severity']?.toString() ?? 'Low';
 
-      final double? percent = risk['percent'] is num
-          ? (risk['percent'] as num).toDouble()
-          : double.tryParse(risk['percent']?.toString() ?? '');
+        final double? percent = risk['percent'] is num
+            ? (risk['percent'] as num).toDouble()
+            : double.tryParse(risk['percent']?.toString() ?? '');
 
-      await showRiskNotification(
-        crop: crop,
-        diseaseName: diseaseName,
-        riskLevel: severity,
-        severity: severity,
-        riskPercent: percent,
-      );
+        await showRiskNotification(
+          crop: crop,
+          diseaseName: diseaseName,
+          riskLevel: severity,
+          severity: severity,
+          riskPercent: percent,
+        );
 
-      await Future.delayed(const Duration(milliseconds: 350));
+        await Future.delayed(const Duration(milliseconds: 350));
+      }
+    } catch (e) {
+      debugPrint('showMultipleRiskNotifications error: $e');
     }
   }
 
@@ -352,7 +355,7 @@ class NotificationService {
           data['diseaseName']?.toString() ??
           data['name']?.toString() ??
           '',
-      fallback: 'Disease risk',
+      fallback: 'Disease Risk',
     );
 
     final risk = _formatText(
@@ -363,14 +366,46 @@ class NotificationService {
       fallback: 'Risk',
     );
 
-    final percent = data['risk_percent']?.toString() ??
+    final rawPercent = data['risk_percent']?.toString() ??
         data['riskPercent']?.toString() ??
         data['percent']?.toString() ??
         '';
 
-    final percentText = percent.trim().isNotEmpty ? ' ($percent)' : '';
+    final percentText = _formatPercentFromString(rawPercent);
 
     return '$crop: $disease risk is $risk$percentText. Please check AgroX.';
+  }
+
+  // =========================
+  // FORMAT PERCENT
+  // =========================
+  String _formatPercentText(double? riskPercent) {
+    if (riskPercent == null || riskPercent <= 0) return '';
+
+    final double displayPercent =
+        riskPercent <= 1 ? riskPercent * 100 : riskPercent;
+
+    return ' (${displayPercent.toStringAsFixed(0)}%)';
+  }
+
+  String _formatPercentFromString(String value) {
+    final text = value.trim();
+
+    if (text.isEmpty) return '';
+
+    if (text.contains('%')) {
+      return ' ($text)';
+    }
+
+    final parsed = double.tryParse(text);
+
+    if (parsed == null) {
+      return ' ($text)';
+    }
+
+    final displayPercent = parsed <= 1 ? parsed * 100 : parsed;
+
+    return ' (${displayPercent.toStringAsFixed(0)}%)';
   }
 
   // =========================

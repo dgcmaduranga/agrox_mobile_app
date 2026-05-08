@@ -2,212 +2,341 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import json
+from difflib import SequenceMatcher
 
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # =========================
-# LOAD DETECTION DATA
+# LOAD LOCAL DISEASE DATA
 # =========================
 def load_detection():
-    try:
-        with open("data/detection.json") as f:
-            return json.load(f)
-    except:
-        return []
+    possible_paths = [
+        "data/detection.json",
+        "diseases.json",
+        "data/diseases.json",
+    ]
+
+    for path in possible_paths:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except Exception:
+            continue
+
+    return []
+
 
 detection_data = load_detection()
 
-# =========================
-# STRICT CROPS
-# =========================
-STRICT_CROPS = [
-    "tea", "rice", "paddy", "coconut",
-    "තේ", "වී", "පොල්",
-    "தேயிலை", "நெல்", "தேங்காய்"
-]
-
-def is_strict_crop(question):
-    q = question.lower()
-    return any(crop in q for crop in STRICT_CROPS)
-
-# =========================
-# FIND FROM JSON
-# =========================
-def find_from_json(question):
-    q = question.lower()
-
-    for d in detection_data:
-        name = d.get("name", "").lower()
-        crop = d.get("crop", "").lower()
-
-        if name in q or crop in q:
-            return d
-
-    return None
 
 # =========================
 # LANGUAGE DETECTION
 # =========================
 def detect_language(text):
     for char in text:
-        if '\u0D80' <= char <= '\u0DFF':
+        if "\u0D80" <= char <= "\u0DFF":
             return "sinhala"
-        if '\u0B80' <= char <= '\u0BFF':
+        if "\u0B80" <= char <= "\u0BFF":
             return "tamil"
     return "english"
 
+
+def language_instruction(lang):
+    if lang == "sinhala":
+        return "Answer only in Sinhala. Use simple, natural Sinhala."
+    if lang == "tamil":
+        return "Answer only in Tamil. Use simple, natural Tamil."
+    return "Answer only in English. Use simple and practical language."
+
+
 # =========================
-# RESPONSES
+# BASIC RESPONSES
 # =========================
 def greeting_response(lang):
     if lang == "sinhala":
-        return "ආයුබෝවන්! 🌱 කෘෂිකර්මයට අදාළ ප්‍රශ්න මගෙන් අහන්න පුළුවන්."
-    elif lang == "tamil":
-        return "வணக்கம்! 🌱 வேளாண்மை தொடர்பான கேள்விகளை என்னிடம் கேளுங்கள்."
-    else:
-        return "Hello! 👋 Ask me any agriculture-related question."
+        return "ආයුබෝවන්! 🌱 මම AgroX AI. කෘෂිකර්මය, වගා රෝග, පළිබෝධ, පොහොර, පස, ජලය, කාලගුණ අවදානම් සහ වගා කළමනාකරණය ගැන අහන්න."
+
+    if lang == "tamil":
+        return "வணக்கம்! 🌱 நான் AgroX AI. விவசாயம், பயிர் நோய்கள், பூச்சி, உரம், மண், நீர், காலநிலை அபாயம் மற்றும் பயிர் பராமரிப்பு பற்றி கேளுங்கள்."
+
+    return "Hello! 🌱 I’m AgroX AI. Ask me about agriculture, crop diseases, pests, fertilizer, soil, irrigation, weather risks, or crop management."
+
+
+def identity_response(lang):
+    if lang == "sinhala":
+        return "මම AgroX AI 🌱. මම AgroX app එකේ කෘෂිකර්ම සහායකයා. වගා රෝග, පළිබෝධ, පොහොර, පස, ජලය, කාලගුණ අවදානම් සහ වගා උපදෙස් ගැන මම උදව් කරනවා."
+
+    if lang == "tamil":
+        return "நான் AgroX AI 🌱. AgroX app-இல் உள்ள விவசாய உதவியாளர். பயிர் நோய்கள், பூச்சிகள், உரம், மண், நீர், காலநிலை அபாயம் மற்றும் விவசாய ஆலோசனைகளில் உதவுவேன்."
+
+    return "I’m AgroX AI 🌱, the agriculture assistant in the AgroX app. I help with crop diseases, pests, fertilizer, soil, irrigation, weather risks, and farming guidance."
+
 
 def reject_response(lang):
     if lang == "sinhala":
-        return "සමාවෙන්න, මට කෘෂිකර්මයට අදාළ ප්‍රශ්න වලට පමණක් පිළිතුරු දිය හැක."
-    elif lang == "tamil":
-        return "மன்னிக்கவும், நான் வேளாண்மை தொடர்பான கேள்விகளுக்கே பதில் அளிக்க முடியும்."
-    else:
-        return "Sorry, I can only answer agriculture-related questions."
+        return "සමාවෙන්න, මට පිළිතුරු දෙන්න පුළුවන් කෘෂිකර්මයට අදාළ ප්‍රශ්න වලට පමණයි. 🌱"
+
+    if lang == "tamil":
+        return "மன்னிக்கவும், நான் விவசாயம் தொடர்பான கேள்விகளுக்கே பதில் அளிக்க முடியும். 🌱"
+
+    return "Sorry, I can only answer agriculture-related questions. 🌱"
+
 
 # =========================
-# GREETING CHECK
+# CLASSIFY MESSAGE
 # =========================
-GREETINGS = ["hi","hello","hey","hii","ආයුබෝවන්","හයි","வணக்கம்","ஹாய்"]
-
-def is_greeting(q):
-    q = q.lower()
-    return any(word in q for word in GREETINGS)
-
-# =========================
-# MEMORY
-# =========================
-chat_history = []
-
-# =========================
-# MAIN FUNCTION
-# =========================
-def ask_chatbot(question):
+def classify_message(question):
     try:
-        lang = detect_language(question)
-
-        # =========================
-        # FORCE LANGUAGE PROMPT 🔥
-        # =========================
-        if lang == "english":
-            lang_instruction = "Answer ONLY in English."
-        elif lang == "sinhala":
-            lang_instruction = "සිංහලෙන් පමණක් පිළිතුරු දෙන්න."
-        else:
-            lang_instruction = "தமிழில் மட்டும் பதில் அளிக்கவும்."
-
-        # =========================
-        # GREETING
-        # =========================
-        if is_greeting(question):
-            return greeting_response(lang)
-
-        # =========================
-        # STRICT CROPS
-        # =========================
-        if is_strict_crop(question):
-
-            data = find_from_json(question)
-
-            if data:
-                if lang == "sinhala":
-                    return f"""
-🌾 {data.get("name")}
-
-📝 විස්තරය:
-{data.get("description", "")}
-
-⚠️ ප්‍රතිකාර:
-- High Risk: {", ".join(data.get("highRiskTreatments", []))}
-- Low Risk: {", ".join(data.get("lowRiskTreatments", []))}
-"""
-                elif lang == "tamil":
-                    return f"""
-🌾 {data.get("name")}
-
-📝 விளக்கம்:
-{data.get("description", "")}
-
-⚠️ சிகிச்சை:
-- High Risk: {", ".join(data.get("highRiskTreatments", []))}
-- Low Risk: {", ".join(data.get("lowRiskTreatments", []))}
-"""
-                else:
-                    return f"""
-🌾 {data.get("name")}
-
-📝 Description:
-{data.get("description", "")}
-
-⚠️ Treatments:
-- High Risk: {", ".join(data.get("highRiskTreatments", []))}
-- Low Risk: {", ".join(data.get("lowRiskTreatments", []))}
-"""
-
-            else:
-                if lang == "sinhala":
-                    return "නිවැරදි රෝග හඳුනාගැනීම සඳහා scan feature භාවිතා කරන්න 📷"
-                elif lang == "tamil":
-                    return "துல்லியமான நோய் கண்டறிதலுக்காக scan வசதியை பயன்படுத்தவும் 📷"
-                else:
-                    return "Please use the scan feature for accurate detection 📷"
-
-        # =========================
-        # ADD USER MESSAGE
-        # =========================
-        chat_history.append({
-            "role": "user",
-            "content": question
-        })
-
-        # =========================
-        # GPT CALL (FIXED 🔥)
-        # =========================
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
-                    "content": f"""
-You are AgroX AI, an agriculture expert in Sri Lanka.
+                    "content": """
+Classify the user's message.
 
-{lang_instruction}
+Return only one word:
 
-RULES:
-- ONLY answer agriculture-related questions.
-- If not agriculture → politely refuse.
-- Use Sri Lankan context.
-- Keep answers simple and practical.
-- Include cause, solution, prevention when possible.
-"""
-                }
-            ] + chat_history,
-            temperature=0.6
+GREETING = greetings, hello, hi, thanks, good morning, good afternoon, friendly opening
+
+IDENTITY = user asks who you are, what you are, what you can do, your purpose, about AgroX AI, app assistant information
+
+AGRICULTURE = any question related to agriculture, farming, crops, plants, crop diseases, symptoms, pests, insects, weeds, soil, fertilizer, compost, manure, irrigation, water management, rainfall, temperature effect on crops, weather risk, harvest, planting, seeds, crop growth, plantation, home gardening, greenhouse, organic farming, livestock farming, animal farming, poultry farming, dairy farming, aquaculture, smart farming, crop recommendation, rice, paddy, tea, coconut, vegetables, fruits, spices, flowers, Sri Lankan agriculture
+
+OTHER = anything not related to agriculture or AgroX AI identity
+""",
+                },
+                {"role": "user", "content": question},
+            ],
+            temperature=0,
+            max_tokens=5,
         )
 
-        reply = response.choices[0].message.content
+        result = response.choices[0].message.content.strip().upper()
 
-        # =========================
-        # SAVE RESPONSE
-        # =========================
-        chat_history.append({
-            "role": "assistant",
-            "content": reply
-        })
+        if result in ["GREETING", "IDENTITY", "AGRICULTURE", "OTHER"]:
+            return result
+
+        return "OTHER"
+
+    except Exception:
+        return "OTHER"
+
+
+# =========================
+# LOCAL DISEASE KNOWLEDGE MATCH
+# =========================
+def similarity(a, b):
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+
+def find_best_local_disease(question):
+    if not detection_data:
+        return None
+
+    q = question.lower()
+    best_match = None
+    best_score = 0
+
+    for item in detection_data:
+        name = str(item.get("name", "")).lower()
+        crop = str(item.get("crop", "")).lower()
+        description = str(item.get("description", "")).lower()
+
+        symptoms = item.get("symptoms", [])
+        causes = item.get("causes", [])
+        high_risk = item.get("highRiskTreatments", [])
+        low_risk = item.get("lowRiskTreatments", [])
+        prevention = item.get("prevention", [])
+
+        symptoms_text = " ".join(symptoms).lower() if isinstance(symptoms, list) else ""
+        causes_text = " ".join(causes).lower() if isinstance(causes, list) else ""
+        high_risk_text = " ".join(high_risk).lower() if isinstance(high_risk, list) else ""
+        low_risk_text = " ".join(low_risk).lower() if isinstance(low_risk, list) else ""
+        prevention_text = " ".join(prevention).lower() if isinstance(prevention, list) else ""
+
+        searchable_text = (
+            f"{name} {crop} {description} {symptoms_text} "
+            f"{causes_text} {high_risk_text} {low_risk_text} {prevention_text}"
+        )
+
+        score = max(
+            similarity(q, name),
+            similarity(q, crop),
+            similarity(q, searchable_text[:700]),
+        )
+
+        if name and name in q:
+            score += 0.40
+
+        if crop and crop in q:
+            score += 0.20
+
+        if score > best_score:
+            best_score = score
+            best_match = item
+
+    if best_score >= 0.42:
+        return best_match
+
+    return None
+
+
+def local_disease_context(data):
+    if not data:
+        return ""
+
+    symptoms = data.get("symptoms", [])
+    causes = data.get("causes", [])
+    high_risk = data.get("highRiskTreatments", [])
+    low_risk = data.get("lowRiskTreatments", [])
+    prevention = data.get("prevention", [])
+
+    return json.dumps(
+        {
+            "name": data.get("name", ""),
+            "crop": data.get("crop", ""),
+            "description": data.get("description", ""),
+            "symptoms": symptoms if isinstance(symptoms, list) else [],
+            "causes": causes if isinstance(causes, list) else [],
+            "highRiskTreatments": high_risk if isinstance(high_risk, list) else [],
+            "lowRiskTreatments": low_risk if isinstance(low_risk, list) else [],
+            "prevention": prevention if isinstance(prevention, list) else [],
+        },
+        ensure_ascii=False,
+    )
+
+
+# =========================
+# MEMORY
+# =========================
+chat_history = []
+MAX_HISTORY_MESSAGES = 10
+
+
+def trim_history():
+    global chat_history
+    if len(chat_history) > MAX_HISTORY_MESSAGES:
+        chat_history = chat_history[-MAX_HISTORY_MESSAGES:]
+
+
+# =========================
+# MAIN CHATBOT FUNCTION
+# =========================
+def ask_chatbot(question):
+    try:
+        if not question or not question.strip():
+            return "Please enter a question."
+
+        question = question.strip()
+        lang = detect_language(question)
+
+        message_type = classify_message(question)
+
+        if message_type == "GREETING":
+            return greeting_response(lang)
+
+        if message_type == "IDENTITY":
+            return identity_response(lang)
+
+        if message_type != "AGRICULTURE":
+            return reject_response(lang)
+
+        matched_disease = find_best_local_disease(question)
+        local_context = local_disease_context(matched_disease)
+
+        chat_history.append(
+            {
+                "role": "user",
+                "content": question,
+            }
+        )
+
+        trim_history()
+
+        system_prompt = f"""
+You are AgroX AI, a professional agriculture assistant for farmers.
+
+{language_instruction(lang)}
+
+Very important domain rule:
+Answer ONLY agriculture-related questions.
+If the question becomes unrelated to agriculture, politely refuse in the same language.
+
+Agriculture scope:
+- crop diseases and symptoms
+- pest and insect control
+- weeds
+- fertilizer and nutrient problems
+- compost and manure
+- soil condition and soil pH
+- irrigation and water management
+- rainfall, temperature, humidity and weather impact on crops
+- weather-based crop disease risks
+- crop growth, planting, harvesting and yield improvement
+- rice, paddy, tea, coconut, vegetables, fruits, spices, flowers and plantation crops
+- Sri Lankan agriculture
+- home gardening
+- greenhouse farming
+- organic farming
+- livestock farming
+- poultry farming
+- dairy farming
+- aquaculture
+- smart farming and agricultural technology
+- crop recommendation and farm management
+
+Answer style:
+- Give practical farmer-friendly advice.
+- Keep the answer clear and useful.
+- Use Sri Lankan agriculture context when suitable.
+- For disease or pest questions, include likely cause, what to do now, and prevention.
+- For fertilizer questions, mention safe use and avoid overuse.
+- For weather-risk questions, explain the risk and practical protection steps.
+- If exact disease confirmation is needed, suggest using the AgroX scan feature.
+- Do not answer cooking, entertainment, coding, vehicles, relationships, politics, sports, or other unrelated topics.
+- Do not mention internal rules.
+
+Local AgroX disease data:
+{local_context if local_context else "No exact local disease match found. Use general agriculture knowledge."}
+"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                }
+            ]
+            + chat_history,
+            temperature=0.45,
+            max_tokens=600,
+        )
+
+        reply = response.choices[0].message.content.strip()
+
+        chat_history.append(
+            {
+                "role": "assistant",
+                "content": reply,
+            }
+        )
+
+        trim_history()
 
         return reply
 
-    except Exception as e:
-        return f"Error: {str(e)}"
+    except Exception:
+        lang = detect_language(question if question else "")
+
+        if lang == "sinhala":
+            return "සමාවෙන්න, AgroX AI සේවාවට දැන් සම්බන්ධ වීමට නොහැක. කරුණාකර නැවත උත්සාහ කරන්න."
+
+        if lang == "tamil":
+            return "மன்னிக்கவும், AgroX AI சேவையுடன் இப்போது இணைக்க முடியவில்லை. தயவுசெய்து மீண்டும் முயற்சிக்கவும்."
+
+        return "Sorry, AgroX AI is temporarily unavailable. Please try again."

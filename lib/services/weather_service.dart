@@ -103,6 +103,20 @@ class WeatherService {
         return text == 'true' || text == '1' || text == 'yes';
       }
 
+      String titleCase(String value) {
+        final text = value.trim();
+
+        if (text.isEmpty) return '';
+
+        return text
+            .split(' ')
+            .where((word) => word.trim().isNotEmpty)
+            .map((word) {
+          final w = word.trim();
+          return w[0].toUpperCase() + w.substring(1).toLowerCase();
+        }).join(' ');
+      }
+
       final main = asMap(data['main']);
       final windMap = asMap(data['wind']);
       final cloudsMap = asMap(data['clouds']);
@@ -154,6 +168,9 @@ class WeatherService {
           toStr(firstWeather?['description']) ??
           condition;
 
+      final backendDisplayCondition = toStr(data['display_condition']) ??
+          toStr(data['displayCondition']);
+
       final clouds = toInt(data['clouds']) ?? toInt(cloudsMap?['all']) ?? 0;
 
       final sunrise = toInt(data['sunrise']) ?? toInt(sysMap?['sunrise']);
@@ -171,6 +188,7 @@ class WeatherService {
 
       final conditionLower = condition.toLowerCase();
       final descriptionLower = description.toLowerCase();
+      final displayLower = (backendDisplayCondition ?? '').toLowerCase();
 
       final bool hasRain = toBool(data['hasRain']) ||
           toBool(data['has_rain']) ||
@@ -183,25 +201,89 @@ class WeatherService {
           descriptionLower.contains('drizzle') ||
           descriptionLower.contains('shower') ||
           descriptionLower.contains('thunder') ||
-          descriptionLower.contains('storm');
+          descriptionLower.contains('storm') ||
+          displayLower.contains('rain') ||
+          displayLower.contains('drizzle') ||
+          displayLower.contains('shower') ||
+          displayLower.contains('thunder') ||
+          displayLower.contains('storm');
+
+      final bool isCloudy = toBool(data['isCloudy']) ||
+          toBool(data['is_cloudy']) ||
+          conditionLower.contains('cloud') ||
+          descriptionLower.contains('cloud') ||
+          clouds >= 60;
+
+      final bool isClear = toBool(data['isClear']) ||
+          toBool(data['is_clear']) ||
+          conditionLower.contains('clear') ||
+          descriptionLower.contains('clear');
+
+      String displayCondition;
+
+      // Rain always gets priority over cloud text.
+      if (hasRain) {
+        if (conditionLower.contains('thunder') ||
+            descriptionLower.contains('thunder') ||
+            displayLower.contains('thunder')) {
+          displayCondition = 'Thunderstorm';
+        } else if (conditionLower.contains('drizzle') ||
+            descriptionLower.contains('drizzle') ||
+            displayLower.contains('drizzle')) {
+          displayCondition = 'Drizzle';
+        } else if (descriptionLower.contains('heavy rain') ||
+            displayLower.contains('heavy rain')) {
+          displayCondition = 'Heavy Rain';
+        } else if (descriptionLower.contains('light rain') ||
+            displayLower.contains('light rain')) {
+          displayCondition = 'Light Rain';
+        } else {
+          displayCondition = 'Rain';
+        }
+      } else if (backendDisplayCondition != null &&
+          backendDisplayCondition.trim().isNotEmpty) {
+        displayCondition = titleCase(backendDisplayCondition);
+      } else if (description.trim().isNotEmpty) {
+        displayCondition = titleCase(description);
+      } else if (condition.trim().isNotEmpty) {
+        displayCondition = titleCase(condition);
+      } else if (isCloudy) {
+        displayCondition = 'Clouds';
+      } else if (isClear) {
+        displayCondition = 'Clear Sky';
+      } else {
+        displayCondition = 'Unknown';
+      }
 
       return {
         'location': location,
         'city': location,
+
         'temp': temp,
         'temp_max': tempMax,
         'temp_min': tempMin,
+
         'humidity': humidity,
         'pressure': pressure,
         'wind_speed': windSpeed,
+
         'condition': condition,
         'description': description,
+        'display_condition': displayCondition,
+
         'clouds': clouds,
+        'isCloudy': isCloudy,
+        'isClear': isClear,
+
         'sunrise': sunrise,
         'sunset': sunset,
+
         'rain': rain,
         'hasRain': hasRain,
+
         'icon': icon,
+
+        // Keep raw response also. HomePage risk check can use this.
         'raw': data,
       };
     } catch (e) {
