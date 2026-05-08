@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/api_service.dart';
 import '../../services/weather_service.dart';
@@ -26,7 +26,16 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-// Language selector circular button
+// ===============================
+// APP THEME COLORS
+// ===============================
+const Color kDarkGreen = Color(0xFF0B5D1E);
+const Color kMainGreen = Color(0xFF1B7F35);
+const Color kLightGreen = Color(0xFFEAF7EE);
+
+// ===============================
+// LANGUAGE SWITCHER
+// ===============================
 Widget _buildLanguageSwitcher(BuildContext context, bool isDark) {
   final lang = Provider.of<LanguageProvider>(context);
   final display = lang.language.toUpperCase();
@@ -50,7 +59,7 @@ Widget _buildLanguageSwitcher(BuildContext context, bool isDark) {
           display,
           style: const TextStyle(
             color: Colors.white,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
             fontSize: 13,
           ),
         ),
@@ -59,7 +68,6 @@ Widget _buildLanguageSwitcher(BuildContext context, bool isDark) {
   );
 }
 
-// Language selector bottom sheet
 void _showLanguageSelector(BuildContext context) {
   final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
 
@@ -72,7 +80,7 @@ void _showLanguageSelector(BuildContext context) {
     builder: (ctx) {
       return SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -111,29 +119,33 @@ Widget _languageOption(BuildContext context, String label, String code) {
       ),
     ),
     onTap: () {
-      final providerWrite =
-          Provider.of<LanguageProvider>(context, listen: false);
-      providerWrite.setLanguage(code);
+      Provider.of<LanguageProvider>(context, listen: false).setLanguage(code);
       Navigator.pop(context);
     },
     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
     trailing: provider.language == code
-        ? const Icon(Icons.check, color: Colors.green)
+        ? const Icon(Icons.check, color: kDarkGreen)
         : null,
     tileColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
   );
 }
 
+// ===============================
+// HOME PAGE STATE
+// ===============================
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   static const bool _forceDebugCoords = false;
   static const double _debugLat = 5.9485;
   static const double _debugLon = 80.5353;
 
+  static const String _notificationPrefKey = 'agrox_notifications_enabled';
+  static const int _notificationIntervalHours = 4;
+
   Map<String, dynamic>? weather;
   bool isLoading = true;
 
   List<dynamic> riskList = [];
-  String riskText = "Checking risk...";
+  String riskText = 'Checking risk...';
   Color riskColor = Colors.green;
   IconData riskIcon = Icons.check_circle;
 
@@ -143,14 +155,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   DateTime? _lastUpdatedAt;
 
-  // Avoid duplicate notifications for same crop/disease/severity in same day
-  final Set<String> _sentNotificationKeys = {};
-
   final List<Map<String, String>> crops = [
     {
-      'key': 'coconut',
-      'label': 'Coconut',
-      'asset': 'assets/images/coconut.png',
+      'key': 'rice',
+      'label': 'Rice',
+      'asset': 'assets/images/paddy.png',
     },
     {
       'key': 'tea',
@@ -158,9 +167,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'asset': 'assets/images/tea.png',
     },
     {
-      'key': 'rice',
-      'label': 'Rice',
-      'asset': 'assets/images/paddy.png',
+      'key': 'coconut',
+      'label': 'Coconut',
+      'asset': 'assets/images/coconut.png',
     },
   ];
 
@@ -168,14 +177,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadAll();
 
-    // Weather and risk auto refresh
+    _loadAll(showLoader: true);
+
     _refreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      if (mounted) _loadAll();
+      if (mounted) _loadAll(showLoader: false);
     });
 
-    // Last updated text refresh
     _lastUpdatedTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -191,92 +199,91 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _loadAll();
+    if (state == AppLifecycleState.resumed) {
+      _loadAll(showLoader: false);
+    }
   }
 
   String _lastUpdatedText() {
-    if (_lastUpdatedAt == null) {
-      return 'Not updated yet';
-    }
+    if (_lastUpdatedAt == null) return 'Not updated yet';
 
     final diff = DateTime.now().difference(_lastUpdatedAt!);
 
-    if (diff.inSeconds < 60) {
-      return 'Updated just now';
-    }
-
-    if (diff.inMinutes < 60) {
-      return 'Updated ${diff.inMinutes} mins ago';
-    }
-
-    if (diff.inHours < 24) {
-      return 'Updated ${diff.inHours} hours ago';
-    }
+    if (diff.inSeconds < 60) return 'Updated just now';
+    if (diff.inMinutes < 60) return 'Updated ${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return 'Updated ${diff.inHours} hours ago';
 
     return 'Updated ${diff.inDays} days ago';
   }
 
   Future<void> _manualRefreshWeather() async {
     if (isLoading) return;
-    await _loadAll();
+    await _loadAll(showLoader: true, forceNotificationCheck: true);
   }
 
-  Future<void> _loadAll() async {
-    setState(() {
-      isLoading = true;
-      riskText = "Checking risk...";
-      riskColor = Colors.green;
-      riskIcon = Icons.check_circle;
-    });
+  Future<void> _loadAll({
+    bool showLoader = false,
+    bool forceNotificationCheck = false,
+  }) async {
+    if (showLoader && mounted) {
+      setState(() {
+        isLoading = true;
+        riskText = 'Checking risk...';
+        riskColor = Colors.green;
+        riskIcon = Icons.check_circle;
+      });
+    }
 
     final loc = await LocationService.getCurrentLocation();
 
     if (loc == null) {
+      if (!mounted) return;
+
       setState(() {
         isLoading = false;
         weather = null;
         riskList = [];
-        riskText = "Location unavailable";
+        riskText = 'Location unavailable';
+        riskColor = Colors.orange;
+        riskIcon = Icons.location_off;
       });
       return;
     }
 
-    double lat = loc['lat'] as double;
-    double lon = loc['lon'] as double;
+    double lat = _toDouble(loc['lat']) ??
+        _toDouble(loc['latitude']) ??
+        _debugLat;
+
+    double lon = _toDouble(loc['lon']) ??
+        _toDouble(loc['lng']) ??
+        _toDouble(loc['longitude']) ??
+        _debugLon;
 
     if (_forceDebugCoords) {
-      print('HomePage: DEBUG forcing coords to $_debugLat,$_debugLon');
       lat = _debugLat;
       lon = _debugLon;
     }
 
     try {
       final weatherSvc = WeatherService();
-
-      print('HomePage: fetching weather for lat=$lat, lon=$lon');
       final w = await weatherSvc.getWeather(lat, lon);
 
-      final cityName = (loc['city'] as String?) ?? '';
+      final String locationName = _buildAccurateLocationName(
+        loc: loc,
+        weatherData: w,
+        lat: lat,
+        lon: lon,
+      );
 
-      final dynamic rawTemp = w?['temp'];
-      final double? tempVar = rawTemp is num
-          ? rawTemp.toDouble()
-          : rawTemp is String
-              ? double.tryParse(rawTemp)
-              : null;
-
-      final int? humidityVar = w != null && w['humidity'] != null
-          ? w['humidity'] is num
-              ? (w['humidity'] as num).toInt()
-              : int.tryParse(w['humidity'].toString())
-          : null;
+      final double? tempVar = _toDouble(w?['temp']);
+      final int? humidityVar = _toInt(w?['humidity']);
 
       final diseases = await fetchDiseases();
 
       final bool hasRain = _hasRainFromWeather(w);
 
       final cropKeys = crops
-          .map((c) => (c['key'] ?? '').toString().toLowerCase())
+          .map((c) => (c['key'] ?? '').toLowerCase())
           .where((s) => s.isNotEmpty)
           .toList();
 
@@ -289,16 +296,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         limit: 3,
       );
 
+      if (!mounted) return;
+
       setState(() {
         weather = {
           ...?w,
           'temp': tempVar,
           'humidity': humidityVar,
-          'city': cityName.isNotEmpty
-              ? cityName
-              : w != null && (w['city']?.toString().isNotEmpty ?? false)
-                  ? w['city']
-                  : 'Nearby',
+          'hasRain': hasRain,
+          'city': locationName,
+          'location': locationName,
+          'lat': lat,
+          'lon': lon,
         };
 
         riskList = scored.map((d) => d.toJson()).toList();
@@ -307,35 +316,135 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       });
 
       _calculateRiskSummary();
-      await _sendAllRiskNotificationsIfNeeded();
+
+      await _sendAllRiskNotificationsIfNeeded(
+        forceCheck: forceNotificationCheck,
+      );
     } catch (e) {
-      print('HomePage load error: $e');
+      debugPrint('HomePage load error: $e');
+
+      if (!mounted) return;
 
       setState(() {
         isLoading = false;
         weather = null;
         riskList = [];
-        riskText = "Unable to fetch data";
+        riskText = 'Unable to fetch data';
+        riskColor = Colors.orange;
+        riskIcon = Icons.error_outline;
       });
     }
+  }
+
+  // ===============================
+  // ACCURATE LOCATION NAME BUILDER
+  // ===============================
+  String _buildAccurateLocationName({
+    required Map<String, dynamic> loc,
+    required Map<String, dynamic>? weatherData,
+    required double lat,
+    required double lon,
+  }) {
+    final List<String?> possibleNames = [];
+
+    possibleNames.add(_cleanLocationValue(weatherData?['location']));
+    possibleNames.add(_cleanLocationValue(weatherData?['city']));
+    possibleNames.add(_cleanLocationValue(weatherData?['name']));
+
+    final raw = weatherData?['raw'];
+
+    if (raw is Map) {
+      possibleNames.add(_cleanLocationValue(raw['name']));
+
+      final sys = raw['sys'];
+      final rawName = _cleanLocationValue(raw['name']);
+
+      if (sys is Map) {
+        final country = _cleanLocationValue(sys['country']);
+
+        if (rawName != null && country != null) {
+          possibleNames.add('$rawName, $country');
+        }
+      }
+    }
+
+    possibleNames.add(_cleanLocationValue(loc['city']));
+    possibleNames.add(_cleanLocationValue(loc['town']));
+    possibleNames.add(_cleanLocationValue(loc['village']));
+    possibleNames.add(_cleanLocationValue(loc['locality']));
+    possibleNames.add(_cleanLocationValue(loc['subLocality']));
+    possibleNames.add(_cleanLocationValue(loc['district']));
+    possibleNames.add(_cleanLocationValue(loc['administrativeArea']));
+    possibleNames.add(_cleanLocationValue(loc['subAdministrativeArea']));
+    possibleNames.add(_cleanLocationValue(loc['address']));
+
+    for (final name in possibleNames) {
+      if (name != null && name.isNotEmpty) {
+        if (name.toLowerCase() != 'nearby' &&
+            name.toLowerCase() != 'unknown' &&
+            name.toLowerCase() != 'null') {
+          return name;
+        }
+      }
+    }
+
+    return '${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)}';
+  }
+
+  String? _cleanLocationValue(dynamic value) {
+    if (value == null) return null;
+
+    final text = value.toString().trim();
+
+    if (text.isEmpty) return null;
+    if (text.toLowerCase() == 'null') return null;
+    if (text.toLowerCase() == 'unknown') return null;
+
+    return text;
   }
 
   bool _hasRainFromWeather(Map<String, dynamic>? w) {
     if (w == null) return false;
 
+    final dynamic hasRainValue = w['hasRain'];
+    if (hasRainValue == true) return true;
+
+    if (hasRainValue is String) {
+      final text = hasRainValue.toLowerCase().trim();
+      if (text == 'true' || text == '1' || text == 'yes') return true;
+    }
+
     final dynamic rainValue = w['rain'];
 
     if (rainValue is num && rainValue > 0) return true;
 
+    if (rainValue is String) {
+      final parsed = double.tryParse(rainValue);
+      if (parsed != null && parsed > 0) return true;
+    }
+
     final raw = w['raw'];
 
     if (raw is Map) {
-      if (raw['rain'] != null) return true;
+      final rawRain = raw['rain'];
+
+      if (rawRain is Map && rawRain.isNotEmpty) {
+        final oneHour = rawRain['1h'];
+        final threeHour = rawRain['3h'];
+
+        if (_toDouble(oneHour) != null && _toDouble(oneHour)! > 0) {
+          return true;
+        }
+
+        if (_toDouble(threeHour) != null && _toDouble(threeHour)! > 0) {
+          return true;
+        }
+      }
 
       final weatherList = raw['weather'];
 
       if (weatherList is List) {
-        return weatherList.any((it) {
+        final found = weatherList.any((it) {
           if (it is! Map) return false;
 
           final main = it['main']?.toString().toLowerCase() ?? '';
@@ -346,8 +455,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               main.contains('thunder') ||
               description.contains('rain') ||
               description.contains('drizzle') ||
-              description.contains('shower');
+              description.contains('shower') ||
+              description.contains('thunder');
         });
+
+        if (found) return true;
       }
     }
 
@@ -359,7 +471,44 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         condition.contains('thunder') ||
         description.contains('rain') ||
         description.contains('drizzle') ||
-        description.contains('shower');
+        description.contains('shower') ||
+        description.contains('thunder');
+  }
+
+  String _displayCondition(Map<String, dynamic>? w) {
+    if (w == null) return 'Unknown';
+
+    final bool hasRain = _hasRainFromWeather(w);
+
+    final condition = w['condition']?.toString().trim() ?? '';
+    final description = w['description']?.toString().trim() ?? '';
+
+    final conditionLower = condition.toLowerCase();
+    final descriptionLower = description.toLowerCase();
+
+    if (hasRain) {
+      if (conditionLower.contains('thunder') ||
+          descriptionLower.contains('thunder')) {
+        return 'Thunderstorm';
+      }
+
+      if (conditionLower.contains('drizzle') ||
+          descriptionLower.contains('drizzle')) {
+        return 'Drizzle';
+      }
+
+      if (conditionLower.contains('shower') ||
+          descriptionLower.contains('shower')) {
+        return 'Showers';
+      }
+
+      return 'Rain';
+    }
+
+    if (description.isNotEmpty) return _titleCase(description);
+    if (condition.isNotEmpty) return _titleCase(condition);
+
+    return 'Unknown';
   }
 
   Future<List<Disease>> fetchDiseases() async {
@@ -379,15 +528,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       return [];
     } catch (e) {
-      print('Fetch diseases error: $e');
+      debugPrint('Fetch diseases error: $e');
       return [];
     }
   }
 
   void _calculateRiskSummary() {
     if (riskList.isEmpty) {
+      if (!mounted) return;
+
       setState(() {
-        riskText = "Low Risk";
+        riskText = 'Low Risk';
         riskColor = Colors.green;
         riskIcon = Icons.check_circle;
       });
@@ -397,7 +548,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     int highCount = 0;
     int mediumCount = 0;
 
-    for (var d in riskList) {
+    for (final d in riskList) {
       final severity = (d['severity'] ?? '').toString().toLowerCase();
 
       if (severity.contains('high') || severity.contains('severe')) {
@@ -408,34 +559,40 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
     }
 
-    String newRiskText;
-    Color newRiskColor;
-    IconData newRiskIcon;
-
-    if (highCount > 0) {
-      newRiskText = "High disease risk";
-      newRiskColor = Colors.red;
-      newRiskIcon = Icons.warning;
-    } else if (mediumCount > 0) {
-      newRiskText = "Medium disease risk";
-      newRiskColor = Colors.orange;
-      newRiskIcon = Icons.warning_amber_rounded;
-    } else {
-      newRiskText = "Low Risk";
-      newRiskColor = Colors.green;
-      newRiskIcon = Icons.check_circle;
-    }
+    if (!mounted) return;
 
     setState(() {
-      riskText = newRiskText;
-      riskColor = newRiskColor;
-      riskIcon = newRiskIcon;
+      if (highCount > 0) {
+        riskText = 'High disease risk';
+        riskColor = Colors.red;
+        riskIcon = Icons.warning;
+      } else if (mediumCount > 0) {
+        riskText = 'Medium disease risk';
+        riskColor = Colors.orange;
+        riskIcon = Icons.warning_amber_rounded;
+      } else {
+        riskText = 'Low Risk';
+        riskColor = Colors.green;
+        riskIcon = Icons.check_circle;
+      }
     });
   }
 
-  Future<void> _sendAllRiskNotificationsIfNeeded() async {
+  Future<void> _sendAllRiskNotificationsIfNeeded({
+    bool forceCheck = false,
+  }) async {
     try {
       if (riskList.isEmpty) return;
+
+      final notificationsEnabled = await _notificationsEnabled();
+
+      if (!notificationsEnabled) {
+        debugPrint('Risk notification skipped: user disabled notifications');
+        return;
+      }
+
+      final now = DateTime.now();
+      final prefs = await SharedPreferences.getInstance();
 
       final topDiseases = _riskMapsToDiseases(riskList);
       final alerts = RiskService.topRisksForNotificationPerCrop(topDiseases);
@@ -444,26 +601,55 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       for (final disease in alerts) {
         final severity = disease.severity;
+
+        if (!RiskService.isMediumOrHigh(severity)) continue;
+
+        final crop = _formatCropName(disease.crop);
+        final diseaseName = disease.name;
+        final severityText = RiskService.displaySeverity(severity);
         final riskLevel = RiskService.displayRiskLevel(severity);
 
-        final key =
-            '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}-${disease.crop}-${disease.name}-${severity}';
+        final baseKey = '${crop}_${diseaseName}_$severityText'
+            .toLowerCase()
+            .replaceAll(' ', '_');
 
-        if (_sentNotificationKeys.contains(key)) {
+        final lastSentKey = 'agrox_last_notification_$baseKey';
+        final lastSentMillis = prefs.getInt(lastSentKey) ?? 0;
+
+        final lastSent = lastSentMillis > 0
+            ? DateTime.fromMillisecondsSinceEpoch(lastSentMillis)
+            : null;
+
+        final canSend = forceCheck ||
+            lastSent == null ||
+            now.difference(lastSent).inHours >= _notificationIntervalHours;
+
+        if (!canSend) {
+          debugPrint('Risk notification skipped within 4 hours: $baseKey');
           continue;
         }
 
-        _sentNotificationKeys.add(key);
+        await prefs.setInt(lastSentKey, now.millisecondsSinceEpoch);
 
         await NotificationService.instance.showRiskNotification(
-          crop: _formatCropName(disease.crop),
-          diseaseName: disease.name,
+          crop: crop,
+          diseaseName: diseaseName,
           riskLevel: riskLevel,
-          severity: RiskService.displaySeverity(severity),
+          severity: severityText,
+          riskPercent: disease.percent,
         );
       }
     } catch (e) {
-      print('Risk notification error: $e');
+      debugPrint('Risk notification error: $e');
+    }
+  }
+
+  Future<bool> _notificationsEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_notificationPrefKey) ?? true;
+    } catch (_) {
+      return true;
     }
   }
 
@@ -472,21 +658,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final Map<String, dynamic> map = Map<String, dynamic>.from(m as Map);
       final d = Disease.fromJson(map);
 
-      if (map['score'] != null) {
-        d.score = map['score'] is num
-            ? (map['score'] as num).toInt()
-            : int.tryParse(map['score'].toString()) ?? 0;
-      }
-
-      if (map['percent'] != null) {
-        d.percent = map['percent'] is num
-            ? (map['percent'] as num).toDouble()
-            : double.tryParse(map['percent']?.toString() ?? '') ?? 0.0;
-      }
-
-      if (map['severity'] != null) {
-        d.severity = map['severity'].toString();
-      }
+      if (map['score'] != null) d.score = _toInt(map['score']) ?? 0;
+      if (map['percent'] != null) d.percent = _toDouble(map['percent']) ?? 0.0;
+      if (map['severity'] != null) d.severity = map['severity'].toString();
 
       return d;
     }).toList();
@@ -502,6 +676,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (crop.trim().isEmpty) return 'Crop';
 
     return crop[0].toUpperCase() + crop.substring(1);
+  }
+
+  String _titleCase(String value) {
+    final words = value
+        .replaceAll('_', ' ')
+        .trim()
+        .split(' ')
+        .where((w) => w.trim().isNotEmpty)
+        .toList();
+
+    if (words.isEmpty) return value;
+
+    return words.map((word) {
+      final w = word.trim();
+      return w[0].toUpperCase() + w.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 
   bool get _showRiskDot {
@@ -522,7 +724,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _showRiskModal() {
     final topMaps = riskList.isNotEmpty ? riskList.take(3).toList() : [];
-
     final topDiseases = _riskMapsToDiseases(topMaps);
 
     Navigator.push(
@@ -556,6 +757,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
+
     return 'Good Evening';
   }
 
@@ -565,7 +767,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final theme = Provider.of<ThemeProvider>(context);
     final isDark = theme.isDark;
     final mq = MediaQuery.of(context);
-    final double padding = 16.0;
+    const double padding = 16.0;
 
     final String userName = user?.displayName ?? user?.email ?? '';
     final String avatarInitial =
@@ -579,91 +781,89 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       resizeToAvoidBottomInset: false,
       backgroundColor:
           isDark ? const Color(0xFF121212) : const Color(0xFFF6F7F9),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 40),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: mq.size.height - 40),
-            child: IntrinsicHeight(
-              child: Column(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      HeaderWidget(
-                        greeting: greetingStr,
-                        userName: userName,
-                        date: dateStr,
-                        showRiskDot: _showRiskDot,
-                        onBellTap: _showRiskModal,
-                        isDark: isDark,
-                        avatarInitial: avatarInitial,
-                      ),
-                      Positioned(
-                        top: 120,
-                        left: 0,
-                        right: 0,
-                        child: Center(
-                          child: WeatherCard(
-                            weather: weather,
-                            isLoading: isLoading,
-                            isDark: isDark,
-                            statusText: riskText,
-                            statusColor: riskColor,
-                            lastUpdatedText: _lastUpdatedText(),
-                            onRefresh: _manualRefreshWeather,
+      body: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 86),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: mq.size.height - 20),
+                child: Column(
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        HeaderWidget(
+                          greeting: greetingStr,
+                          userName: userName,
+                          date: dateStr,
+                          showRiskDot: _showRiskDot,
+                          onBellTap: _showRiskModal,
+                          isDark: isDark,
+                          avatarInitial: avatarInitial,
+                        ),
+                        Positioned(
+                          top: 118,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: WeatherCard(
+                              weather: weather,
+                              isLoading: isLoading,
+                              isDark: isDark,
+                              statusText: riskText,
+                              statusColor: riskColor,
+                              lastUpdatedText: _lastUpdatedText(),
+                              onRefresh: _manualRefreshWeather,
+                              displayCondition: _displayCondition(weather),
+                              hasRain: _hasRainFromWeather(weather),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
 
-                  const SizedBox(height: 130),
+                    const SizedBox(height: 118),
 
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: padding),
-                    child: Column(
-                      children: [
-                        PremiumCard(
-                          icon: Icons.camera_alt,
-                          title: 'Disease Detection',
-                          subtitle: 'Capture or upload leaf image',
-                          color: Colors.green,
-                          onTap: () => Navigator.pushNamed(context, '/scan'),
-                          isDark: isDark,
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: padding),
+                      child: Column(
+                        children: [
+                          PremiumCard(
+                            icon: Icons.health_and_safety_rounded,
+                            title: 'Disease Detection',
+                            subtitle: 'Detect crop disease from leaf images',
+                            onTap: () => Navigator.pushNamed(context, '/scan'),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 10),
 
-                        const SizedBox(height: 12),
+                          PremiumCard(
+                            icon: Icons.local_library_rounded,
+                            title: 'Knowledge Hub',
+                            subtitle: 'Read diseases, symptoms & treatments',
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/knowledge'),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 10),
 
-                        PremiumCard(
-                          icon: Icons.menu_book,
-                          title: 'Knowledge Hub',
-                          subtitle: 'Learn diseases & treatments',
-                          color: Colors.orange,
-                          onTap: () =>
-                              Navigator.pushNamed(context, '/knowledge'),
-                          isDark: isDark,
-                        ),
+                          PremiumCard(
+                            icon: Icons.smart_toy_rounded,
+                            title: 'Ask AgroX AI',
+                            subtitle: 'Get smart farming advice instantly',
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/chatbot'),
+                            isDark: isDark,
+                          ),
 
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 10),
 
-                        PremiumCard(
-                          icon: Icons.smart_toy,
-                          title: 'Ask AgroX AI',
-                          subtitle: 'Instant farming advice',
-                          color: Colors.blue,
-                          onTap: () =>
-                              Navigator.pushNamed(context, '/chatbot'),
-                          isDark: isDark,
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            TranslatedText(
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TranslatedText(
                               'Best Fields',
                               style: TextStyle(
                                 fontSize: 16,
@@ -671,62 +871,62 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 color: isDark ? Colors.white : Colors.black,
                               ),
                             ),
-                            TextButton(
-                              onPressed: () {},
-                              child: TranslatedText(
-                                'See All',
-                                style: TextStyle(
-                                  color: Colors.green.shade700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        SizedBox(
-                          height: 120,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: crops.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(width: 12),
-                            itemBuilder: (context, i) {
-                              final c = crops[i];
-
-                              return CropCard(
-                                label: c['label']!,
-                                asset: c['asset']!,
-                                isDark: isDark,
-                              );
-                            },
                           ),
-                        ),
 
-                        const SizedBox(height: 12),
-                      ],
+                          const SizedBox(height: 7),
+
+                          SizedBox(
+                            height: 105,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: crops.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, i) {
+                                final c = crops[i];
+
+                                return CropCard(
+                                  label: c['label']!,
+                                  asset: c['asset']!,
+                                  isDark: isDark,
+                                );
+                              },
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
-      bottomNavigationBar: FloatingBottomNav(
-        activeIndex: _bottomIndex,
-        isDark: isDark,
-        showCenterButton: true,
-        onTap: (i) {
-          if (i == 0) {
-            setState(() => _bottomIndex = 0);
-          } else if (i == 1) {
-            setState(() => _bottomIndex = 1);
-            Navigator.pushNamed(context, '/profile');
-          }
-        },
-        onCenterTap: () => Navigator.pushNamed(context, '/scan'),
+
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 6,
+            child: SafeArea(
+              top: false,
+              child: FloatingBottomNav(
+                activeIndex: _bottomIndex,
+                isDark: isDark,
+                showCenterButton: true,
+                onTap: (i) {
+                  if (i == 0) {
+                    setState(() => _bottomIndex = 0);
+                  } else if (i == 1) {
+                    setState(() => _bottomIndex = 1);
+                    Navigator.pushNamed(context, '/profile');
+                  }
+                },
+                onCenterTap: () => Navigator.pushNamed(context, '/scan'),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -795,8 +995,9 @@ class HeaderWidget extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color.fromARGB(255, 76, 175, 80),
-              Color.fromARGB(255, 102, 187, 106),
+              Color(0xFF064E1A),
+              Color(0xFF0B5D1E),
+              Color(0xFF1B7F35),
             ],
           ),
           borderRadius: const BorderRadius.only(
@@ -805,9 +1006,9 @@ class HeaderWidget extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
+              color: kDarkGreen.withOpacity(0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -817,7 +1018,7 @@ class HeaderWidget extends StatelessWidget {
               Positioned.fill(
                 child: Container(
                   decoration: const BoxDecoration(
-                    color: Color.fromRGBO(0, 0, 0, 0.22),
+                    color: Color.fromRGBO(0, 0, 0, 0.18),
                     borderRadius: BorderRadius.only(
                       bottomLeft: Radius.circular(30),
                       bottomRight: Radius.circular(30),
@@ -825,125 +1026,106 @@ class HeaderWidget extends StatelessWidget {
                   ),
                 ),
               ),
-
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 30, 16, 12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Flexible(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Builder(
-                            builder: (ctx) {
-                              String name = userName.trim();
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Builder(
+                          builder: (ctx) {
+                            String name = userName.trim();
 
-                              if (name.isNotEmpty) {
-                                final parts = name.split(' ');
-                                name = parts
-                                    .map(
-                                      (p) => p.isEmpty
-                                          ? p
-                                          : p[0].toUpperCase() + p.substring(1),
-                                    )
-                                    .join(' ');
-                              }
+                            if (name.isNotEmpty) {
+                              final parts = name.split(' ');
+                              name = parts
+                                  .map(
+                                    (p) => p.isEmpty
+                                        ? p
+                                        : p[0].toUpperCase() + p.substring(1),
+                                  )
+                                  .join(' ');
+                            }
 
-                              return Row(
-                                children: [
-                                  TranslatedText(
-                                    '$greeting, ',
+                            return Row(
+                              children: [
+                                TranslatedText(
+                                  '$greeting, ',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    '${name.isNotEmpty ? name : 'User'} 👋',
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 18,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
-                                  Flexible(
-                                    child: Text(
-                                      '${name.isNotEmpty ? name : 'User'} 👋',
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-
-                          const SizedBox(height: 6),
-
-                          Text(
-                            date,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        GestureDetector(
-                          onTap: onBellTap,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              const Icon(
-                                Icons.notifications_none,
-                                color: Colors.white,
-                                size: 26,
-                              ),
-
-                              if (showRiskDot)
-                                Positioned(
-                                  top: -4,
-                                  right: -4,
-                                  child: Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black26,
-                                          blurRadius: 2,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
                                 ),
-                            ],
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          date,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
                           ),
                         ),
-
-                        const SizedBox(width: 10),
-
-                        _buildLanguageSwitcher(context, isDark),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GestureDetector(
+                        onTap: onBellTap,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            const Icon(
+                              Icons.notifications_none,
+                              color: Colors.white,
+                              size: 26,
+                            ),
+                            if (showRiskDot)
+                              Positioned(
+                                top: -4,
+                                right: -4,
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _buildLanguageSwitcher(context, isDark),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
@@ -954,7 +1136,7 @@ class HeaderWidget extends StatelessWidget {
 }
 
 // ===============================
-// WEATHER CARD WITHOUT SUNRISE / SUNSET
+// WEATHER CARD
 // ===============================
 class WeatherCard extends StatelessWidget {
   final Map<String, dynamic>? weather;
@@ -964,6 +1146,8 @@ class WeatherCard extends StatelessWidget {
   final Color statusColor;
   final String lastUpdatedText;
   final VoidCallback onRefresh;
+  final String displayCondition;
+  final bool hasRain;
 
   const WeatherCard({
     this.weather,
@@ -973,19 +1157,28 @@ class WeatherCard extends StatelessWidget {
     required this.statusColor,
     required this.lastUpdatedText,
     required this.onRefresh,
+    required this.displayCondition,
+    required this.hasRain,
     super.key,
   });
 
-  String _emojiForCondition(String? cond) {
-    if (cond == null) return '🌤';
-
+  String _emojiForCondition(String cond, bool rain) {
     final c = cond.toLowerCase();
 
-    if (c.contains('rain') || c.contains('drizzle')) return '🌧';
-    if (c.contains('cloud')) return '☁️';
+    if (rain) {
+      if (c.contains('thunder')) return '⛈️';
+      if (c.contains('drizzle')) return '🌦️';
+      return '🌧️';
+    }
+
+    if (c.contains('rain') || c.contains('drizzle')) return '🌧️';
+    if (c.contains('thunder') || c.contains('storm')) return '⛈️';
+    if (c.contains('cloud') || c.contains('overcast')) return '☁️';
     if (c.contains('clear') || c.contains('sun')) return '☀️';
+    if (c.contains('mist') || c.contains('fog') || c.contains('haze')) {
+      return '🌫️';
+    }
     if (c.contains('snow')) return '❄️';
-    if (c.contains('thunder') || c.contains('storm')) return '🌩';
 
     return '🌤';
   }
@@ -1044,12 +1237,6 @@ class WeatherCard extends StatelessWidget {
             : double.tryParse(weather!['wind_speed'].toString()) ?? 0.0
         : 0.0;
 
-    final String condition = weather != null
-        ? (weather!['condition']?.toString() ??
-            weather!['description']?.toString() ??
-            '')
-        : '';
-
     final tempStr = '${tempNum.toStringAsFixed(1)}°C';
 
     return Container(
@@ -1074,11 +1261,10 @@ class WeatherCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Location + Risk + Refresh
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Icon(Icons.location_on, color: Colors.green, size: 18),
+              const Icon(Icons.location_on, color: kDarkGreen, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1120,22 +1306,19 @@ class WeatherCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isDark
                         ? Colors.white.withOpacity(0.08)
-                        : Colors.green.withOpacity(0.08),
+                        : kDarkGreen.withOpacity(0.08),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.refresh_rounded,
                     size: 18,
-                    color: isDark ? Colors.white70 : Colors.green.shade700,
+                    color: isDark ? Colors.white70 : kDarkGreen,
                   ),
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 6),
-
-          // Temperature + Condition
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1156,12 +1339,14 @@ class WeatherCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      _emojiForCondition(condition),
+                      _emojiForCondition(displayCondition, hasRain),
                       style: const TextStyle(fontSize: 18),
                     ),
                     const SizedBox(height: 2),
                     TranslatedText(
-                      condition.isNotEmpty ? condition : 'Unknown',
+                      displayCondition.isNotEmpty
+                          ? displayCondition
+                          : 'Unknown',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -1173,10 +1358,7 @@ class WeatherCard extends StatelessWidget {
               ),
             ],
           ),
-
           const Spacer(),
-
-          // Humidity / Pressure / Wind
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1199,9 +1381,7 @@ class WeatherCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 7),
-
           Row(
             children: [
               Icon(
@@ -1279,7 +1459,6 @@ class PremiumCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final Color color;
   final VoidCallback? onTap;
   final bool isDark;
 
@@ -1287,7 +1466,6 @@ class PremiumCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.color,
     this.onTap,
     this.isDark = false,
     super.key,
@@ -1295,23 +1473,34 @@ class PremiumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cardColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF102014);
+    final subTextColor = isDark ? Colors.white70 : Colors.black54;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: Container(
           width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 0),
-          constraints: const BoxConstraints(minHeight: 85),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          constraints: const BoxConstraints(minHeight: 78),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 13),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            color: cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.06)
+                  : kDarkGreen.withOpacity(0.07),
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 8,
+                color: isDark
+                    ? Colors.black.withOpacity(0.22)
+                    : kDarkGreen.withOpacity(0.07),
+                blurRadius: 14,
                 offset: const Offset(0, 6),
               ),
             ],
@@ -1319,16 +1508,47 @@ class PremiumCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF2C2C2E)
-                      : const Color(0xFFF2F2F7),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark
+                        ? [
+                            kDarkGreen.withOpacity(0.45),
+                            kDarkGreen.withOpacity(0.18),
+                          ]
+                        : [
+                            kLightGreen,
+                            Colors.white,
+                          ],
+                  ),
                 ),
-                child: Icon(icon, color: color, size: 26),
+                child: Center(
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.10)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(
+                        color: kDarkGreen.withOpacity(0.18),
+                        width: 1,
+                      ),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: kDarkGreen,
+                      size: 23,
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1336,27 +1556,38 @@ class PremiumCard extends StatelessWidget {
                     TranslatedText(
                       title,
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black,
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w800,
+                        color: textColor,
+                        height: 1.1,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     TranslatedText(
                       subtitle,
                       style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.white70 : Colors.black54,
+                        fontSize: 12.7,
+                        fontWeight: FontWeight.w500,
+                        color: subTextColor,
+                        height: 1.23,
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: isDark ? Colors.white54 : Colors.grey,
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.06) : kLightGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: isDark ? Colors.white60 : kDarkGreen,
+                ),
               ),
             ],
           ),
@@ -1388,7 +1619,7 @@ class CropCard extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: 160,
+          width: 150,
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -1409,7 +1640,7 @@ class CropCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.black.withOpacity(0.28),
+                      Colors.black.withOpacity(0.35),
                       Colors.transparent,
                     ],
                     begin: Alignment.bottomCenter,
@@ -1419,13 +1650,13 @@ class CropCard extends StatelessWidget {
               ),
               Positioned(
                 left: 12,
-                bottom: 12,
+                bottom: 10,
                 child: Text(
                   label,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
-                    fontSize: 16,
+                    fontSize: 15,
                   ),
                 ),
               ),

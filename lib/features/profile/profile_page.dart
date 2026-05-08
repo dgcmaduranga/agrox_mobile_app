@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/theme_provider.dart';
-import '../../services/language_provider.dart';
 import '../../services/notification_service.dart';
 import '../../widgests/translated_text.dart';
 
@@ -21,13 +20,20 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
+// ===============================
+// APP THEME COLORS
+// ===============================
+const Color kDarkGreen = Color(0xFF0B5D1E);
+const Color kMainGreen = Color(0xFF1B7F35);
+const Color kLightGreen = Color(0xFFEAF7EE);
+
 class _ProfilePageState extends State<ProfilePage> {
   static const String _notificationPrefKey = 'agrox_notifications_enabled';
 
   bool _notifications = true;
   bool _notificationLoading = true;
 
-  final user = FirebaseAuth.instance.currentUser;
+  User? get user => FirebaseAuth.instance.currentUser;
 
   @override
   void initState() {
@@ -36,7 +42,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // =========================
-  // 🔔 LOAD NOTIFICATION SETTING
+  // LOAD NOTIFICATION SETTING
   // =========================
   Future<void> _loadNotificationPreference() async {
     try {
@@ -60,7 +66,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // =========================
-  // 🔔 TOGGLE NOTIFICATIONS
+  // TOGGLE NOTIFICATIONS
   // =========================
   Future<void> _toggleNotifications(bool value) async {
     if (_notificationLoading) return;
@@ -110,46 +116,144 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // 🔥 LANGUAGE CHANGE (use provider, no restart)
-  void changeLang(String lang) {
-    final provider = Provider.of<LanguageProvider>(context, listen: false);
-    provider.setLanguage(lang);
-  }
+  // =========================
+  // FIXED TOP GREEN HEADER
+  // =========================
+  Widget _premiumTopHeader(BuildContext context, User? currentUser) {
+    final String name =
+        currentUser?.displayName?.trim().isNotEmpty == true
+            ? currentUser!.displayName!.trim()
+            : 'Profile';
 
-  void _showLanguageBottomSheet() {
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+    final String email = currentUser?.email ?? '';
 
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    final String initial = email.isNotEmpty
+        ? email[0].toUpperCase()
+        : name.isNotEmpty
+            ? name[0].toUpperCase()
+            : 'U';
+
+    return Container(
+      width: double.infinity,
+      height: 96,
+      padding: const EdgeInsets.fromLTRB(8, 12, 14, 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF064E1A),
+            Color(0xFF0B5D1E),
+            Color(0xFF1B7F35),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: kDarkGreen.withOpacity(0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            onPressed: () {
+              Navigator.pushReplacementNamed(context, '/home');
+            },
+          ),
+
+          const SizedBox(width: 2),
+
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.10),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          Expanded(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  height: 4,
-                  width: 48,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.grey[800] : Colors.grey[300],
-                    borderRadius: BorderRadius.circular(4),
+                const TranslatedText(
+                  "Profile",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    height: 1.1,
                   ),
                 ),
-                _languageTile('English', 'en'),
-                _languageTile('සිංහල', 'si'),
-                _languageTile('தமிழ்', 'ta'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 5),
+                Text(
+                  email.isNotEmpty ? email : name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.78),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
-        );
-      },
+
+          GestureDetector(
+            onTap: _showEditProfileDialog,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.16),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.20),
+                ),
+              ),
+              child: const Icon(
+                Icons.edit_rounded,
+                color: Colors.white,
+                size: 21,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -157,127 +261,56 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDark;
+    final currentUser = user;
+
+    final Color bgColor =
+        isDark ? const Color(0xFF0B0F14) : const Color(0xFFF6F8F5);
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF6F7F9),
-      appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: isDark ? Colors.white : Colors.black,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const TranslatedText(
-          'Profile',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      extendBody: true,
+      backgroundColor: bgColor,
+      body: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            // =========================
+            // SCROLL CONTENT ONLY
+            // =========================
+            SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(14, 120, 14, 178),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  /// PROFILE CARD (modern compact)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(top: 5),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: isDark
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                offset: const Offset(0, 2),
-                                blurRadius: 6,
-                              )
-                            ],
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: Colors.green.shade200,
-                          child: Text(
-                            user?.email?[0].toUpperCase() ?? "U",
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                user?.displayName ?? "User",
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : Colors.black,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                user?.email ?? "",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark ? Colors.grey : Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: _showEditProfileDialog,
-                          icon: Icon(
-                            Icons.edit,
-                            size: 18,
-                            color: isDark ? Colors.white : Colors.black,
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
                   _sectionTitle("Account", isDark),
 
                   _tile(
-                    icon: Icons.person,
+                    icon: Icons.person_rounded,
                     titleWidget: const TranslatedText(
                       'Edit Profile',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     subtitleWidget: const TranslatedText(
                       'Update your details',
-                      style: TextStyle(fontSize: 11),
+                      style: TextStyle(fontSize: 11.8),
                     ),
                     isDark: isDark,
                     onTap: _showEditProfileDialog,
                   ),
 
                   _tile(
-                    icon: Icons.lock,
+                    icon: Icons.lock_rounded,
                     titleWidget: const TranslatedText(
                       'Change Password',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    subtitle: user?.email ?? "",
+                    subtitle: currentUser?.email ?? "",
                     isDark: isDark,
                     onTap: () {
                       Navigator.push(
@@ -294,13 +327,13 @@ class _ProfilePageState extends State<ProfilePage> {
                     titleWidget: const TranslatedText(
                       'Detection History',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     subtitleWidget: const TranslatedText(
                       'View your last 5 detection results',
-                      style: TextStyle(fontSize: 11),
+                      style: TextStyle(fontSize: 11.8),
                     ),
                     isDark: isDark,
                     onTap: () {
@@ -318,13 +351,13 @@ class _ProfilePageState extends State<ProfilePage> {
                     titleWidget: const TranslatedText(
                       'Saved Treatments',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     subtitleWidget: const TranslatedText(
                       'View your saved treatment tips',
-                      style: TextStyle(fontSize: 11),
+                      style: TextStyle(fontSize: 11.8),
                     ),
                     isDark: isDark,
                     onTap: () {
@@ -337,12 +370,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     },
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
                   _sectionTitle("Settings", isDark),
 
                   _switchTile(
-                    icon: Icons.dark_mode,
+                    icon: Icons.dark_mode_rounded,
                     title: "Dark Mode",
                     value: isDark,
                     isDark: isDark,
@@ -351,9 +384,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     },
                   ),
 
-                  // =========================
-                  // ✅ NOTIFICATION ON / OFF BUTTON
-                  // =========================
                   _switchTile(
                     icon: _notifications
                         ? Icons.notifications_active_rounded
@@ -364,40 +394,50 @@ class _ProfilePageState extends State<ProfilePage> {
                     onChanged: _toggleNotifications,
                   ),
 
-                  const SizedBox(height: 10),
-
-                  _sectionTitle("Language", isDark),
-
-                  _tile(
-                    icon: Icons.language,
-                    title: "Select Language",
-                    subtitle: Provider.of<LanguageProvider>(context).language,
-                    isDark: isDark,
-                    onTap: _showLanguageBottomSheet,
-                  ),
-
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
                   _sectionTitle("About", isDark),
 
                   Container(
-                    margin: const EdgeInsets.only(bottom: 5),
+                    margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                      horizontal: 12,
+                      vertical: 13,
+                      horizontal: 14,
                     ),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      color: isDark ? const Color(0xFF161B22) : Colors.white,
+                      borderRadius: BorderRadius.circular(21),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.06)
+                            : kDarkGreen.withOpacity(0.06),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              Colors.black.withOpacity(isDark ? 0.18 : 0.035),
+                          blurRadius: 12,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.info,
-                          color: Colors.green,
-                          size: 18,
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color:
+                                isDark ? const Color(0xFF102A1A) : kLightGreen,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.info_rounded,
+                            color: kDarkGreen,
+                            size: 22,
+                          ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,23 +445,28 @@ class _ProfilePageState extends State<ProfilePage> {
                               TranslatedText(
                                 'AgroX',
                                 style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white : Colors.black,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF102014),
                                 ),
                               ),
+                              const SizedBox(height: 3),
                               TranslatedText(
                                 'Version 1.0.0',
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark ? Colors.grey : Colors.black54,
+                                  fontSize: 11.8,
+                                  color:
+                                      isDark ? Colors.white60 : Colors.black54,
                                 ),
                               ),
                               TranslatedText(
                                 'AI-powered agriculture assistant',
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark ? Colors.grey : Colors.black54,
+                                  fontSize: 11.8,
+                                  color:
+                                      isDark ? Colors.white60 : Colors.black54,
                                 ),
                               ),
                             ],
@@ -430,103 +475,105 @@ class _ProfilePageState extends State<ProfilePage> {
                       ],
                     ),
                   ),
-
-                  const SizedBox(height: 10),
                 ],
               ),
             ),
-          ),
 
-          // Persistent Logout button
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: GestureDetector(
-              onTap: _showLogoutConfirmation,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Text(
-                    'Logout',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+            // ===============================
+            // FIXED TOP HEADER
+            // ===============================
+            Positioned(
+              left: 14,
+              right: 14,
+              top: 8,
+              child: _premiumTopHeader(context, currentUser),
+            ),
+
+            // ===============================
+            // FIXED LOGOUT BUTTON + BOTTOM NAV
+            // ===============================
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF0B0F14).withOpacity(0.94)
+                        : const Color(0xFFF6F8F5).withOpacity(0.94),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GestureDetector(
+                        onTap: _showLogoutConfirmation,
+                        child: Container(
+                          width: double.infinity,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE53935),
+                            borderRadius: BorderRadius.circular(17),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.red.withOpacity(0.22),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Logout',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _ProfileBottomNav(
+                        isDark: isDark,
+                        activeIndex: 1,
+                        onHomeTap: () {
+                          Navigator.pushReplacementNamed(context, '/home');
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomAppBar(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        elevation: 8,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navItem(Icons.home, 'Home', 0),
-              _navItem(Icons.person, 'Profile', 1),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
 
-  ////////////////////////////////////////////////////////////
-
-  Widget _navItem(IconData icon, String label, int index) {
-    final isSelected = index == 1;
-
-    return GestureDetector(
-      onTap: () {
-        if (index == 0) {
-          Navigator.pushReplacementNamed(context, '/home');
-        }
-      },
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? Colors.green : Colors.grey,
-          ),
-          const SizedBox(height: 2),
-          TranslatedText(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isSelected ? Colors.green : Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  ////////////////////////////////////////////////////////////
-
+  // =========================
+  // STYLED DIALOG
+  // =========================
   Future<T?> _showStyledDialog<T>({required Widget child}) {
     return showDialog<T>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
-        final isDark =
-            Provider.of<ThemeProvider>(context, listen: false).isDark;
+        final isDark = Provider.of<ThemeProvider>(
+          context,
+          listen: false,
+        ).isDark;
 
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: Dialog(
-            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            backgroundColor: isDark ? const Color(0xFF161B22) : Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -551,26 +598,37 @@ class _ProfilePageState extends State<ProfilePage> {
             'Edit Profile',
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : Colors.black,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : const Color(0xFF102014),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           TextField(
             controller: controller,
-            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+            style: TextStyle(
+              color: isDark ? Colors.white : const Color(0xFF102014),
+            ),
             decoration: InputDecoration(
               labelText: 'Name',
               labelStyle: TextStyle(
-                color: isDark ? Colors.grey[400] : Colors.grey[700],
+                color: isDark ? Colors.white60 : Colors.black54,
               ),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF0B0F14) : kLightGreen,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(
+                  color: kMainGreen,
+                  width: 1.4,
+                ),
               ),
               isDense: true,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -583,27 +641,55 @@ class _ProfilePageState extends State<ProfilePage> {
                 onPressed: () async {
                   try {
                     await user!.updateDisplayName(controller.text.trim());
+                    await user!.reload();
+
+                    if (!mounted) return;
+
                     Navigator.pop(context);
                     setState(() {});
+
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Profile updated')),
+                      const SnackBar(
+                        content: Text('Profile updated'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
                     );
                   } catch (e) {
+                    if (!mounted) return;
+
                     Navigator.pop(context);
+
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
                     );
                   }
                 },
-                child: const Text('Save'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kMainGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
               ),
             ],
-          )
+          ),
         ],
       ),
     );
   }
 
+  // =========================
+  // LOGOUT
+  // =========================
   Future<void> _showLogoutConfirmation() async {
     final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
 
@@ -615,13 +701,16 @@ class _ProfilePageState extends State<ProfilePage> {
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
           child: AlertDialog(
-            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            backgroundColor: isDark ? const Color(0xFF161B22) : Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
             ),
             title: Text(
               'Confirm Logout',
-              style: TextStyle(color: isDark ? Colors.white : Colors.black),
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF102014),
+                fontWeight: FontWeight.w900,
+              ),
             ),
             content: Text(
               'Are you sure you want to logout?',
@@ -636,12 +725,29 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               ElevatedButton(
                 onPressed: () async {
-                  await FirebaseAuth.instance.signOut();
                   Navigator.pop(ctx);
-                  Navigator.pushReplacementNamed(context, '/login');
+
+                  await FirebaseAuth.instance.signOut();
+
+                  if (!mounted) return;
+
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/welcome',
+                    (route) => false,
+                  );
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Logout'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Logout',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
               ),
             ],
           ),
@@ -650,8 +756,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  ////////////////////////////////////////////////////////////
-
+  // =========================
+  // TILE
+  // =========================
   Widget _tile({
     required IconData icon,
     String? title,
@@ -664,16 +771,36 @@ class _ProfilePageState extends State<ProfilePage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 5),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 13),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: isDark ? const Color(0xFF161B22) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : kDarkGreen.withOpacity(0.06),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.18 : 0.035),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: Colors.green),
-            const SizedBox(width: 10),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF102A1A) : kLightGreen,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, size: 21, color: kMainGreen),
+            ),
+            const SizedBox(width: 11),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -682,29 +809,47 @@ class _ProfilePageState extends State<ProfilePage> {
                       Text(
                         title ?? '',
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? Colors.white : Colors.black,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color:
+                              isDark ? Colors.white : const Color(0xFF102014),
                         ),
                       ),
+                  const SizedBox(height: 3),
                   subtitleWidget ??
                       Text(
                         subtitle ?? '',
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? Colors.grey : Colors.black54,
+                          fontSize: 11.8,
+                          color: isDark ? Colors.white60 : Colors.black54,
                         ),
                       ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 12),
+            Container(
+              width: 29,
+              height: 29,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.06) : kLightGreen,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 12,
+                color: isDark ? Colors.white60 : kDarkGreen,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  // =========================
+  // SWITCH TILE
+  // =========================
   Widget _switchTile({
     required IconData icon,
     required String title,
@@ -713,29 +858,53 @@ class _ProfilePageState extends State<ProfilePage> {
     required Function(bool) onChanged,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 5),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 13),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.06)
+              : kDarkGreen.withOpacity(0.06),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.18 : 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.green),
-          const SizedBox(width: 10),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF102A1A) : kLightGreen,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, size: 21, color: kMainGreen),
+          ),
+          const SizedBox(width: 11),
           Expanded(
-            child: Text(
+            child: TranslatedText(
               title,
               style: TextStyle(
-                fontSize: 14,
-                color: isDark ? Colors.white : Colors.black,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : const Color(0xFF102014),
               ),
             ),
           ),
-          Switch(
-            value: value,
-            activeColor: Colors.green,
-            onChanged: onChanged,
+          Transform.scale(
+            scale: 0.88,
+            child: Switch(
+              value: value,
+              activeColor: kMainGreen,
+              onChanged: onChanged,
+            ),
           ),
         ],
       ),
@@ -744,39 +913,109 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _sectionTitle(String text, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: TranslatedText(
         text,
         style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: isDark ? Colors.grey : Colors.black54,
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+          color: isDark ? Colors.white60 : Colors.black54,
         ),
       ),
     );
   }
+}
 
-  Widget _languageTile(String label, String code) {
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDark;
+// ===============================
+// PROFILE BOTTOM NAV - HOME + PROFILE ONLY
+// ===============================
+class _ProfileBottomNav extends StatelessWidget {
+  final bool isDark;
+  final int activeIndex;
+  final VoidCallback onHomeTap;
 
-    return ListTile(
-      title: Text(
-        label,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: isDark ? Colors.white : Colors.black,
+  const _ProfileBottomNav({
+    required this.isDark,
+    required this.activeIndex,
+    required this.onHomeTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 62,
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF161B22).withOpacity(0.96)
+            : Colors.white.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.06) : Colors.black12,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _bottomItem(
+            icon: Icons.home_rounded,
+            label: 'Home',
+            selected: activeIndex == 0,
+            onTap: onHomeTap,
+          ),
+          _bottomItem(
+            icon: Icons.person_rounded,
+            label: 'Profile',
+            selected: activeIndex == 1,
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bottomItem({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 112,
+        height: 44,
+        decoration: BoxDecoration(
+          color: selected ? kLightGreen : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: selected ? kMainGreen : Colors.grey,
+            ),
+            const SizedBox(height: 1),
+            TranslatedText(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                color: selected ? kMainGreen : Colors.grey,
+              ),
+            ),
+          ],
         ),
       ),
-      onTap: () {
-        changeLang(code);
-        Navigator.pop(context);
-      },
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-      trailing: Provider.of<LanguageProvider>(context).language == code
-          ? const Icon(Icons.check, color: Colors.green)
-          : null,
-      tileColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
     );
   }
 }

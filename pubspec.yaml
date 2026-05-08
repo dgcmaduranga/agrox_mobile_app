@@ -74,3 +74,4 @@ flutter:
     - assets/images/diseases/tea/
     - assets/images/diseases/rice/
     - assets/images/diseases/coconut/
+    - diseases.json
