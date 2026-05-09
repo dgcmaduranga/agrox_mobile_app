@@ -139,258 +139,352 @@ class ResultPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: scaffoldBg,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: IconThemeData(color: mainText),
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: mainText,
-          ),
-          onPressed: () {
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              '/home',
-              (route) => false,
-            );
-          },
-        ),
-        title: TranslatedText(
-          "Detection Result",
-          style: TextStyle(
-            color: mainText,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        centerTitle: true,
-      ),
 
       // =========================
-      // BODY ONLY SCROLLS
+      // MAIN BODY
       // =========================
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // =========================
-              // RESULT CARD
-              // =========================
-              Container(
-                padding: const EdgeInsets.all(18),
+        child: Column(
+          children: [
+            // =========================
+            // FIXED SMALL GREEN HEADER
+            // =========================
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderColor),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF006B2D),
+                      Color(0xFF0A8F3C),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: shadowColor,
-                      blurRadius: 10,
+                      color: Colors.green.withOpacity(0.25),
+                      blurRadius: 14,
                       offset: const Offset(0, 6),
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    // Disease name
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.bug_report,
-                          color: Colors.purple,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TranslatedText(
-                            disease,
-                            style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.bold,
-                              color: mainText,
-                            ),
-                          ),
-                        ),
-                      ],
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/home',
+                          (route) => false,
+                        );
+                      },
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 23,
+                      ),
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(width: 14),
 
-                    // Crop
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.eco,
-                          color: Colors.green,
+                    Container(
+                      height: 48,
+                      width: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.20),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TranslatedText(
-                            "Crop: $crop",
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: subText,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                      ),
+                      child: const Icon(
+                        Icons.verified_rounded,
+                        color: Colors.white,
+                        size: 27,
+                      ),
                     ),
 
-                    const SizedBox(height: 12),
+                    const SizedBox(width: 13),
 
-                    // Accuracy + Risk
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.track_changes,
-                          color: Colors.red,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TranslatedText(
-                            "Accuracy: ${accuracy.toStringAsFixed(2)}%",
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: subText,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: riskColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: TranslatedText(
-                            risk,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TranslatedText(
+                            "Detection Result",
                             style: const TextStyle(
                               color: Colors.white,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 2),
+                          TranslatedText(
+                            "AI crop disease report 🌱",
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.88),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
 
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.warning,
-                          color: riskColor,
+                    Container(
+                      height: 44,
+                      width: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.16),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.20),
                         ),
-                        const SizedBox(width: 8),
-                        TranslatedText(
-                          "$risk Risk Level",
-                          style: TextStyle(
-                            color: riskColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                      ),
+                      child: const Icon(
+                        Icons.eco_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ],
                 ),
               ),
+            ),
 
-              const SizedBox(height: 24),
-
-              // =========================
-              // DESCRIPTION
-              // =========================
-              TranslatedText(
-                "Description",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: mainText,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: sectionBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borderColor),
-                ),
-                child: TranslatedText(
-                  description,
-                  style: TextStyle(
-                    height: 1.5,
-                    color: subText,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // =========================
-              // TREATMENT
-              // =========================
-              TranslatedText(
-                "Recommended Treatment",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: mainText,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              ...treatment.map<Widget>((t) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 2),
-                        child: Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TranslatedText(
-                          t.toString(),
-                          style: TextStyle(
-                            height: 1.4,
-                            color: subText,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+            // =========================
+            // SCROLL CONTENT ONLY
+            // =========================
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // =========================
+                    // RESULT CARD
+                    // =========================
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderColor),
+                        boxShadow: [
+                          BoxShadow(
+                            color: shadowColor,
+                            blurRadius: 10,
+                            offset: const Offset(0, 6),
                           ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Disease name
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.bug_report,
+                                color: Colors.purple,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TranslatedText(
+                                  disease,
+                                  style: TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.bold,
+                                    color: mainText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // Crop
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.eco,
+                                color: Colors.green,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TranslatedText(
+                                  "Crop: $crop",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: subText,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Accuracy + Risk
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.track_changes,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TranslatedText(
+                                  "Accuracy: ${accuracy.toStringAsFixed(2)}%",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: subText,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: riskColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: TranslatedText(
+                                  risk,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.warning,
+                                color: riskColor,
+                              ),
+                              const SizedBox(width: 8),
+                              TranslatedText(
+                                "$risk Risk Level",
+                                style: TextStyle(
+                                  color: riskColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // =========================
+                    // DESCRIPTION
+                    // =========================
+                    TranslatedText(
+                      "Description",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: mainText,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: sectionBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: TranslatedText(
+                        description,
+                        style: TextStyle(
+                          height: 1.5,
+                          color: subText,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ],
-                  ),
-                );
-              }).toList(),
+                    ),
 
-              const SizedBox(height: 10),
-            ],
-          ),
+                    const SizedBox(height: 24),
+
+                    // =========================
+                    // TREATMENT
+                    // =========================
+                    TranslatedText(
+                      "Recommended Treatment",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: mainText,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    ...treatment.map<Widget>((t) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TranslatedText(
+                                t.toString(),
+                                style: TextStyle(
+                                  height: 1.4,
+                                  color: subText,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+
+                    const SizedBox(height: 10),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
 

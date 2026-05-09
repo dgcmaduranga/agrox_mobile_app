@@ -28,16 +28,10 @@ class _DetectPageState extends State<DetectPage> {
 
   final ImagePicker picker = ImagePicker();
 
-  // =========================
-  // APP COLORS
-  // =========================
   static const Color kDarkGreen = Color(0xFF0B5D1E);
   static const Color kMainGreen = Color(0xFF1B7F35);
   static const Color kLightGreen = Color(0xFFEAF8E7);
 
-  // =========================
-  // CAMERA
-  // =========================
   Future<void> captureImage() async {
     try {
       final XFile? picked = await picker.pickImage(
@@ -64,9 +58,6 @@ class _DetectPageState extends State<DetectPage> {
     }
   }
 
-  // =========================
-  // GALLERY
-  // =========================
   Future<void> pickImage() async {
     try {
       final XFile? picked = await picker.pickImage(
@@ -93,9 +84,6 @@ class _DetectPageState extends State<DetectPage> {
     }
   }
 
-  // =========================
-  // DETECT
-  // =========================
   Future<void> detect() async {
     if (isLoading) return;
 
@@ -151,9 +139,6 @@ class _DetectPageState extends State<DetectPage> {
 
     final String status = res["status"]?.toString().toLowerCase().trim() ?? "";
 
-    // =========================
-    // SUCCESS RESPONSE
-    // =========================
     if (status == "success") {
       res["crop"] = res["crop"]?.toString().isNotEmpty == true
           ? res["crop"].toString()
@@ -187,15 +172,9 @@ class _DetectPageState extends State<DetectPage> {
       return;
     }
 
-    // =========================
-    // FAILED / UNKNOWN RESPONSE
-    // =========================
     handleFailedResponse(res);
   }
 
-  // =========================
-  // FAILED MESSAGE HANDLER
-  // =========================
   void handleFailedResponse(Map<String, dynamic> res) {
     final String prediction =
         res["prediction"]?.toString().toLowerCase().trim() ?? "";
@@ -255,9 +234,6 @@ class _DetectPageState extends State<DetectPage> {
     showError("Detection could not identify this image");
   }
 
-  // =========================
-  // MESSAGE HELPERS
-  // =========================
   void showError(String msg) {
     if (!mounted) return;
 
@@ -301,9 +277,6 @@ class _DetectPageState extends State<DetectPage> {
     }
   }
 
-  // =========================
-  // UI
-  // =========================
   @override
   Widget build(BuildContext context) {
     Provider.of<LanguageProvider>(context);
@@ -524,15 +497,20 @@ class _DetectPageState extends State<DetectPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          Center(
-                                            child: TranslatedText(
-                                              "Capture or upload a clear leaf image",
-                                              style: TextStyle(
-                                                color: isDark
-                                                    ? Colors.white38
-                                                    : Colors.grey.shade500,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 18,
+                                            ),
+                                            child: Center(
+                                              child: TranslatedText(
+                                                "Use a clear, non-blurry, natural leaf image with the full leaf clearly visible",
+                                                style: TextStyle(
+                                                  color: isDark
+                                                      ? Colors.white38
+                                                      : Colors.grey.shade500,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -674,9 +652,6 @@ class _DetectPageState extends State<DetectPage> {
     );
   }
 
-  // =========================
-  // TOP HEADER
-  // =========================
   Widget _premiumTopHeader(BuildContext context) {
     return Container(
       width: double.infinity,
@@ -784,9 +759,6 @@ class _DetectPageState extends State<DetectPage> {
     );
   }
 
-  // =========================
-  // ACTION BUTTON
-  // =========================
   Widget _actionButton({
     required IconData icon,
     required String label,
@@ -841,9 +813,6 @@ class _DetectPageState extends State<DetectPage> {
     );
   }
 
-  // =========================
-  // CROP CARD
-  // =========================
   Widget cropCard({
     required String crop,
     required String emoji,
