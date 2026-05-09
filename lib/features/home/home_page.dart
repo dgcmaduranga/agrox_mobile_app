@@ -567,7 +567,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         riskColor = Colors.red;
         riskIcon = Icons.warning;
       } else if (mediumCount > 0) {
-        riskText = 'Medium disease risk';
+        riskText = 'Medium risk';
         riskColor = Colors.orange;
         riskIcon = Icons.warning_amber_rounded;
       } else {
